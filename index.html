@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Click2Check — Affordability Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  rel="stylesheet"
+/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="demo-data.js"></script>
+<script src="engine.js"></script>
+<style>
+/* ---- Shared with the HMRC demo (click2checkdev.github.io/HMRC-demo), copied verbatim ---- */
+  :root {
+    --brand: #e61758;
+    --brand-ink: #a30f3f;
+    --teal: #3cb89a;
+    --teal-ink: #1f7a63;
+    --ink: #1c1b1f;
+    --muted: #7b7b7b;
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --border: #dfe1e6;
+    --border-strong: #c7cad1;
+    --font-display: "Roboto", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: "Roboto", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--muted);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.46153846;
+    -webkit-font-smoothing: antialiased;
+    background-image: radial-gradient(circle at 1px 1px, rgba(28,27,31,0.045) 1px, transparent 0);
+    background-size: 22px 22px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 26px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { font-family: var(--font-display); font-weight: 600; font-size: 22px; }
+  .logo span { color: var(--brand); }
+  .header-tag { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.03em; }
+
+  main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 56px 24px;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 20px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 40px 44px;
+    max-width: 620px;
+    width: 100%;
+    box-shadow: 0 1px 2px rgba(28,27,31,0.04);
+  }
+  .card.wide { max-width: 680px; padding: 44px 48px; overflow: hidden; }
+  .card.wide.report-card::before {
+    content: "DEMO ONLY";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 90px;
+    color: var(--brand);
+    opacity: 0.06;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .card.wide.report-card > * { position: relative; z-index: 1; }
+  .card.centered { text-align: center; padding: 44px; }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--brand);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .eyebrow.muted { color: var(--muted); }
+
+  h1.title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 30px;
+    line-height: 1.15;
+    margin: 0 0 10px;
+    color: var(--ink);
+  }
+  .card.wide h1.title { font-size: 28px; color: var(--brand); margin-bottom: 6px; }
+
+  .subtitle { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 30px; max-width: 480px; }
+  .card.wide .subtitle { font-size: 13px; margin-bottom: 30px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 16px; margin-bottom: 32px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.span2 { grid-column: span 2; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .field input, .field select {
+    font: inherit; font-size: 14px; padding: 10px 12px;
+    border-radius: 3px; border: 1px solid var(--border-strong);
+    background: #fff; color: var(--ink);
+  }
+
+  .btn-primary {
+    width: 100%; padding: 14px 20px; background: var(--brand); color: #fff;
+    border: none; border-radius: 3px; font-size: 15px; font-weight: 600;
+  }
+  .btn-primary:hover { background: var(--brand-ink); }
+
+  .actions { display: flex; gap: 12px; }
+  .actions .btn-primary { flex: 1; padding: 13px 20px; font-size: 14px; }
+  .btn-secondary {
+    padding: 13px 20px; background: transparent; color: var(--ink);
+    border: 1px solid var(--border-strong); border-radius: 3px; font-size: 14px; font-weight: 600;
+  }
+
+  .spinner-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
+  .spinner {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2.5px solid var(--border); border-top-color: var(--brand);
+    animation: spin 0.8s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  h2.processing-title { font-family: var(--font-display); font-weight: 500; font-size: 22px; margin: 0; color: var(--ink); }
+
+  .stamp-wrap { position: absolute; top: 26px; right: 32px; pointer-events: none; }
+  .stamp {
+    border: 3px solid var(--teal); border-radius: 50%; width: 118px; height: 118px;
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(-11deg); background: rgba(60,184,154,0.06);
+    animation: stampIn 0.4s cubic-bezier(0.2,0.8,0.2,1) both;
+  }
+  .stamp span {
+    font-family: var(--font-mono); font-weight: 700; font-size: 12.5px;
+    letter-spacing: 0.03em; color: var(--teal-ink); text-align: center; line-height: 1.3;
+  }
+  @keyframes stampIn {
+    0% { transform: rotate(-11deg) scale(2.2); opacity: 0; }
+    60% { opacity: 1; }
+    100% { transform: rotate(-11deg) scale(1); opacity: 1; }
+  }
+
+  .section { margin-bottom: 26px; }
+  .section h2 {
+    font-family: var(--font-display); font-size: 16px; font-weight: 500; color: var(--brand);
+    margin: 0 0 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;
+  }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f2; font-size: 13.5px; }
+  .row .label { color: var(--muted); }
+  .row .value { font-weight: 500; color: var(--ink); }
+  .row .value.mono { font-family: var(--font-mono); }
+
+  .employer { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: var(--ink); }
+  .status-badge {
+    font-family: var(--font-mono); font-size: 10.5px; background: rgba(60,184,154,0.12);
+    color: var(--teal-ink); padding: 3px 8px; border-radius: 20px; margin-left: 8px; font-weight: 600;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px 10px; background: var(--bg); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid #f0f0f2; color: var(--ink); }
+
+  .disclaimer {
+    font-size: 12.5px; font-weight: 600; color: var(--brand-ink);
+    background: rgba(230,23,88,0.06); border: 1px solid rgba(230,23,88,0.25);
+    border-radius: 4px; padding: 12px 14px; margin: 8px 0 28px; line-height: 1.5;
+  }
+  .section-note { font-size: 11.5px; color: var(--muted); font-style: italic; margin: -6px 0 10px; }
+  .employer-note { font-size: 11px; color: var(--muted); font-style: italic; margin: 8px 0 4px; line-height: 1.5; }
+
+  .payments-detail { margin: 12px 0 24px; }
+  .payments-detail summary {
+    cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--brand);
+    padding: 8px 0; list-style: none;
+  }
+  .payments-detail summary::-webkit-details-marker { display: none; }
+  .payments-detail summary::before { content: "▸ "; }
+  .payments-detail[open] summary::before { content: "▾ "; }
+  .detail-block { border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; margin-bottom: 8px; background: var(--bg); }
+  .detail-block-header { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+  .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .detail-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .detail-cols ul { margin: 4px 0 0; padding-left: 16px; font-size: 12px; color: var(--ink); }
+  .detail-cols li { margin-bottom: 2px; }
+
+  body { flex-direction: column; }
+
+  .app-header {
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    height: 92px; flex-shrink: 0;
+  }
+  .app-header .header-logo {
+    width: 300px; flex-shrink: 0; padding: 0 32px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .app-header .header-logo .logo-img { display: block; height: 30px; width: 120px; object-fit: contain; object-position: left center; }
+  .app-header .header-logo .logo-sub { font-family: var(--font-body); font-size: 9px; font-weight: 500; letter-spacing: 0.12em; color: var(--muted); margin-top: 4px; }
+
+  .app-header h1 { flex: 1; font-family: var(--font-display); font-weight: 400; font-size: 26px; color: var(--brand); margin: 0; padding-left: 10px; }
+  .app-header .welcome { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 10px; padding-right: 40px; white-space: nowrap; }
+
+  .body-row { display: flex; flex: 1; min-height: 0; }
+
+  .sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 28px 0;
+  }
+
+  .sidebar-nav { display: flex; flex-direction: column; gap: 4px; padding: 0 24px; }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 16px;
+    padding: 15px 18px; border-radius: 4px; border: none; background: none;
+    font-size: 17px; font-weight: 400; color: var(--muted); text-align: left; width: 100%;
+
+  }
+  .sidebar-link:hover { background: var(--surface); }
+  .sidebar-link.active { background: var(--brand); color: #fff; font-weight: 500; }
+  .sidebar-link .icon { width: 20px; height: 20px; flex-shrink: 0; }
+
+  .content-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  main { padding: 40px 32px; align-items: flex-start; }
+
+  .hidden { display: none !important; }
+
+  .portal-card { max-width: 860px; width: 100%; }
+  .portal-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
+  .portal-header h1 { margin: 0 0 4px; }
+  .portal-header .subtitle { margin: 0; }
+
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 30px; }
+  .stat-box { border: 1px solid var(--border); border-radius: 4px; padding: 18px 20px; background: var(--bg); }
+  .stat-box .stat-value { font-family: var(--font-display); font-size: 30px; font-weight: 500; color: var(--ink); }
+  .stat-box .stat-label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .stat-box.brand .stat-value { color: var(--brand); }
+  .stat-box.teal .stat-value { color: var(--teal-ink); }
+
+  .case-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .case-table th { text-align: left; padding: 10px 14px; background: var(--bg); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .case-table td { padding: 12px 14px; border-bottom: 1px solid #f0f0f2; color: var(--ink); }
+  .case-table tbody tr { cursor: pointer; }
+  .case-table tbody tr:hover { background: var(--bg); }
+  .case-table .mono { font-family: var(--font-mono); font-size: 12px; }
+  .cat-pill {
+    font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .cat-pill.residential { background: rgba(60,184,154,0.12); color: var(--teal-ink); }
+  .cat-pill.commercial { background: rgba(230,23,88,0.1); color: var(--brand-ink); }
+
+  .back-link { background: none; border: none; color: var(--muted); font-size: 13px; font-weight: 600; padding: 0; margin-bottom: 18px; display: inline-flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: var(--ink); }
+
+  /* Added with the consent journey -- hints under form fields, the presenter's
+     scenario selector, the consent hand-off panel and the status pills. */
+  .field-hint { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+
+  .demo-control {
+    border: 1px dashed var(--border-strong); border-radius: 4px;
+    padding: 16px 18px; margin: 0 0 28px; background: var(--bg);
+  }
+  .demo-control-label {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 12px;
+  }
+
+  .steps { margin: 22px 0 26px; padding-left: 22px; font-size: 14px; line-height: 1.65; color: var(--ink); }
+  .steps li { margin-bottom: 11px; }
+  .steps strong { font-weight: 600; }
+
+  .link-box {
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 14px 16px; background: var(--bg); margin-bottom: 24px;
+  }
+  .link-box-label {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 7px;
+  }
+  .link-box code { font-family: var(--font-mono); font-size: 12.5px; color: var(--brand-ink); word-break: break-all; }
+
+  .note-box {
+    border-left: 3px solid var(--border-strong); padding: 2px 0 2px 14px;
+    font-size: 13.5px; line-height: 1.6; color: var(--muted); margin: 0 0 26px;
+    text-align: left;
+  }
+  .note-box strong { color: var(--ink); font-weight: 600; }
+
+  .demo-note {
+    font-size: 11.5px; color: var(--muted); line-height: 1.5;
+    margin: 14px 0 0; font-style: italic;
+  }
+
+  .status-pill {
+    font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border-radius: 20px;
+    font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+    background: #ececef; color: #5f5f66;
+  }
+  .status-pill.delivered,
+  .status-pill.ready { background: rgba(60,184,154,0.14); color: var(--teal-ink); }
+  .status-pill.awaiting_consent,
+  .status-pill.polling { background: rgba(224,150,30,0.16); color: #8a5a06; }
+  .status-pill.failed { background: rgba(230,23,88,0.1); color: var(--brand-ink); }
+  .status-pill.lg { font-size: 11.5px; padding: 5px 11px; }
+
+  /* Case detail: header, the summary grid, and the status panels that stand in
+     for what the real portal shows on a case that is not finished. */
+  .detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+  .detail-head h1 { margin: 0; font-size: 24px; }
+
+  .detail-grid {
+    display: grid; grid-template-columns: auto 1fr; gap: 8px 20px;
+    margin: 0 0 26px; font-size: 13.5px;
+  }
+  .detail-grid dt { color: var(--muted); }
+  .detail-grid dd { margin: 0; color: var(--ink); }
+
+  .panel {
+    border: 1px solid var(--border); border-radius: 4px; background: var(--bg);
+    padding: 16px 18px; margin-bottom: 24px; font-size: 13.5px; line-height: 1.6;
+  }
+  .panel.danger { border-color: rgba(230,23,88,0.3); background: rgba(230,23,88,0.04); }
+  .panel p { margin: 0 0 10px; }
+  .panel p:last-child { margin-bottom: 0; }
+  .panel .panel-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .panel .btn-secondary, .panel .btn-primary { padding: 9px 16px; font-size: 13px; }
+  .panel code { font-family: var(--font-mono); font-size: 12px; color: var(--brand-ink); word-break: break-all; }
+  .panel .note { font-size: 11.5px; color: var(--muted); font-style: italic; }
+
+  .filter-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 13px; }
+  .filter-row label { color: var(--muted); }
+  .filter-row select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 3px; border: 1px solid var(--border-strong); background: var(--surface); }
+/* ---- Affordability demo additions ---- */
+  .portal-card { max-width: 980px; }
+  .card.wide { max-width: 980px; }
+  .stat-row.four { grid-template-columns: repeat(4, 1fr); }
+  .section h2 .count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+  .source-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .status-pill.match, .status-pill.verified { background: rgba(60,184,154,0.14); color: var(--teal-ink); }
+  .status-pill.difference, .status-pill.replaced, .status-pill.added, .status-pill.amended,
+  .status-pill.missing { background: rgba(224,150,30,0.16); color: #8a5a06; }
+  .status-pill.alert { background: rgba(230,23,88,0.1); color: var(--brand-ink); }
+  .status-pill.prefilled { background: rgba(92,80,190,0.12); color: #4b3fa3; }
+  .status-pill.derived, .status-pill.declared { background: #ececef; color: #5f5f66; }
+  .finding { border-left: 3px solid var(--border-strong); }
+  .finding.difference { border-left-color: #e0961e; }
+  .finding.alert { border-left-color: var(--brand); }
+  .finding .finding-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .finding .finding-source { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); letter-spacing: 0.03em; text-transform: uppercase; }
+  .finding .finding-text { color: var(--ink); }
+  .figures { display: flex; gap: 28px; flex-wrap: wrap; margin: 12px 0 2px; }
+  .figures .fig-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  .figures .fig-value { font-size: 16px; color: var(--ink); font-weight: 500; }
+  .figures .fig-value.new { color: var(--brand); }
+  .inline-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .inline-form input[type=text], .inline-form select {
+    font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 3px;
+    border: 1px solid var(--border-strong); background: #fff; color: var(--ink); min-width: 0;
+  }
+  .inline-form input[type=text] { flex: 1 1 220px; }
+  .inline-form .btn-primary, .inline-form .btn-secondary { width: auto; padding: 9px 16px; font-size: 13px; }
+  .inline-form label.check { font-size: 12.5px; color: var(--ink); display: inline-flex; gap: 6px; align-items: center; }
+  .btn-primary:disabled { background: var(--border-strong); cursor: not-allowed; }
+  .money { font-variant-numeric: tabular-nums; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .table-wrap { overflow-x: auto; margin-bottom: 8px; }
+  .row .value .status-pill { margin-left: 8px; }
+  .mono { font-family: var(--font-mono); font-size: 12px; }
+  .small { font-size: 12px; }
+  .group-title { font-size: 12.5px; font-weight: 600; color: var(--ink); margin: 16px 0 4px; }
+  .sidebar-foot { margin-top: auto; padding: 0 24px; }
+  .sidebar-foot button { width: 100%; }
+  .sidebar-foot .note { font-size: 11.5px; color: var(--muted); line-height: 1.5; margin: 0 0 10px; }
+  .flow { counter-reset: step; list-style: none; padding: 0; margin: 0 0 24px; }
+  .flow li { position: relative; padding: 0 0 18px 44px; color: var(--ink); line-height: 1.55; }
+  .flow li::before {
+    counter-increment: step; content: counter(step);
+    position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--brand); color: #fff; font-weight: 600; font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .flow li strong { font-weight: 600; }
+  .flow li .tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.04em; margin-left: 6px; }
+  .tag.code { color: var(--teal-ink); }
+  .tag.ai { color: #4b3fa3; }
+  .template-select { max-width: 100%; }
+  #mobile-nav { display: none; font: inherit; font-size: 13px; padding: 6px 8px; margin-right: 16px;
+                border: 1px solid var(--border-strong); border-radius: 3px; background: #fff; }
+  @media (max-width: 860px) {
+    .sidebar { display: none; }
+    .app-header { height: auto; padding: 14px 0; }
+    .app-header .header-logo { width: auto; padding: 0 16px; }
+    .app-header h1 { font-size: 18px; padding-left: 0; }
+    .app-header .welcome { display: none; }
+    #mobile-nav { display: block; }
+    .stat-row, .stat-row.four { grid-template-columns: 1fr 1fr; }
+    main { padding: 24px 12px; }
+    .card, .card.wide { padding: 24px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="header-logo">
+    <img src="logo.png" alt="Click2Check" class="logo-img" width="120" height="30" onerror="this.style.display='none'" />
+  </div>
+  <h1 id="page-title">ABC Ltd cases</h1>
+  <select id="mobile-nav" aria-label="Go to">
+    <option value="portal">Cases</option><option value="templates">Firm templates</option><option value="how">How it works</option>
+  </select>
+  <div class="welcome">
+    Welcome, ABC Ltd
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1.5-4 5-6 7.5-6s6 2 7.5 6"/></svg>
+  </div>
+</div>
+
+<div class="body-row">
+
+<div class="sidebar">
+  <nav class="sidebar-nav">
+    <button class="sidebar-link active" data-view="portal">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
+      ABC Ltd cases
+    </button>
+    <button class="sidebar-link" data-view="templates">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>
+      Firm templates
+    </button>
+    <button class="sidebar-link" data-view="how">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+      How it works
+    </button>
+  </nav>
+  <div class="sidebar-foot">
+    <p class="note">Decisions you make are kept in this browser until you reset.</p>
+    <button class="btn-secondary" id="reset-btn">Reset demo</button>
+  </div>
+</div>
+
+<div class="content-area">
+<main>
+
+  <!-- CASE LIST -->
+  <div id="portal-view" class="card portal-card">
+    <div class="portal-header">
+      <div>
+        <div class="eyebrow muted">Affordability</div>
+        <h1 class="title" style="font-size:26px;">ABC Ltd</h1>
+        <p class="subtitle">Each case brings the customer's credit file, Open Banking, AML, ID and HMRC data together, checks them against what the customer entered, and fills the fact find and budget planner.</p>
+      </div>
+    </div>
+    <div class="stat-row four">
+      <div class="stat-box brand"><div class="stat-value" id="stat-total"></div><div class="stat-label">Cases</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-commercial"></div><div class="stat-label">Commercial</div></div>
+      <div class="stat-box teal"><div class="stat-value" id="stat-residential"></div><div class="stat-label">Residential</div></div>
+      <div class="stat-box"><div class="stat-value" id="stat-open"></div><div class="stat-label">Differences open</div></div>
+    </div>
+    <div class="table-wrap">
+    <table class="case-table">
+      <thead><tr><th>Applicants</th><th>Category</th><th>Status</th><th>Open items</th><th>Reference</th><th>Opened</th></tr></thead>
+      <tbody id="case-list"></tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- CASE DETAIL -->
+  <div id="case-view" class="card wide hidden"></div>
+
+  <!-- TEMPLATES -->
+  <div id="templates-view" class="card wide hidden"></div>
+
+  <!-- HOW IT WORKS -->
+  <div id="how-view" class="card wide hidden">
+    <div class="eyebrow muted">How it works</div>
+    <h1 class="title">One layer between the customer, the adviser and the forms</h1>
+    <p class="subtitle" style="max-width:640px">C2C doesn't just collect reports. It checks them against each other and against the customer, then fills whichever form the firm uses.</p>
+    <ol class="flow">
+      <li><strong>Collect.</strong> Credit file, Open Banking (several banks), AML, ID check. HMRC is optional: the customer chooses PAYE, SA302 or both, in one consent journey (see the <a href="https://click2checkdev.github.io/HMRC-demo/" target="_blank" rel="noopener">HMRC demo</a>).</li>
+      <li><strong>Open Banking aggregate.</strong> Accounts connected twice are merged, overlapping feeds de-duplicated, transfers between the customer's own accounts paired, and every transaction placed on a budget planner line. <span class="tag code">RULES · ACCOUNTSCORE MAP · MERCHANT MEMORY · TRAINED MODEL</span></li>
+      <li><strong>C2C Data Pack.</strong> Every party's credit, banking, AML and ID in one file. Residential and commercial use the same model; a commercial case adds the company, and each director gets the same personal checks.</li>
+      <li><strong>Validate.</strong> What the customer entered is compared with every source: salary and bonus against HMRC payroll, profit against SA302, commitments against the credit file, spending against the bank. Differences are flagged, not changed.</li>
+      <li><strong>Broker and customer decide.</strong> Accept the source figure, keep the entered one with a reason, or categorise what the bank data couldn't place. Every decision goes on the audit trail. <span class="tag code">NO AI ON A CASE</span></li>
+      <li><strong>Fact find and budget planner.</strong> Populated and validated, on the lines of the C2C Mortgage Expenditure Form, with where each figure came from.</li>
+      <li><strong>Fill any template.</strong> The C2C form, or the firm's own PDF, Excel or form fields. AI proposes how a new template maps; a person approves it once, and from then on it fills every case. <span class="tag ai">AI PROPOSES · PERSON APPROVES</span></li>
+    </ol>
+    <p class="note-box"><strong>What's real in this demo:</strong> every figure, check and difference was produced by the affordability engine from fictional sample reports. Your clicks replay decisions in the browser, and the Excel files are filled in the browser from the same mapping files the service uses. <strong>What isn't:</strong> the reports are made up, and nothing is sent anywhere.</p>
+  </div>
+
+</main>
+<footer>Click2Check — this is a review demo using fictional data. No real reports are requested.</footer>
+</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const D = window.DEMO, E = window.Engine;
+  const WHO = "Demo adviser";
+  const KEY = "c2c-affordability-demo-v1";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s === null || s === undefined ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const gbp = (v) => (v === null || v === undefined || v === "") ? "–" : "£" + E.fmt(v);
+  const SOURCE = { HMRC_PAYROLL: "HMRC payroll", HMRC_SA: "HMRC SA302", OPEN_BANKING: "Open Banking",
+                   CREDIT_FILE: "Credit file", AML: "AML search", IDV: "ID check", COMPANY_REPORT: "Company report",
+                   CREDIT: "Credit file", COMPANY_PROFILE: "Company report", HMRC: "HMRC" };
+  const BASIS = { RULE: "Rule", PROVIDER: "AccountScore category", MEMORY: "Merchant memory",
+                  OVERRIDE: "Broker", PATTERN: "Regular pay", MODEL: "Trained model",
+                  MATCHED_TRANSFER: "Own transfer", NONE: "Needs a broker" };
+  const CAT = {}; D.categories.forEach((c) => { CAT[c.value] = c.label; });
+  CAT.TRANSFER = "Own transfer"; CAT.UNCATEGORISED = "Not yet categorised";
+
+  // ---- state ------------------------------------------------------------------
+  let state;
+  function fresh() {
+    const cases = JSON.parse(JSON.stringify(D.cases));
+    cases.forEach((c) => { c.status = "REVIEW"; });
+    return { cases: cases, template: null };
+  }
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY));
+      if (saved && saved.generated === D.generated) return saved.state;
+    } catch (e) { /* private window or blocked storage: start fresh */ }
+    return fresh();
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ generated: D.generated, state: state })); } catch (e) { /* ignore */ }
+  }
+  state = load();
+
+  // ---- helpers ---------------------------------------------------------------------
+  const openFindings = (c) => c.findings.filter((f) => !f.decision && f.outcome !== "MATCH");
+  const blocking = (c) => openFindings(c).filter((f) => f.outcome === "DIFFERENCE").length;
+  const pill = (cls, text) => `<span class="status-pill ${esc(cls)}">${esc(text)}</span>`;
+  function caseTitle(c) {
+    const people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
+    const company = c.parties.find((p) => p.role === "COMPANY");
+    if (company) return company.name;
+    if (people.length === 2 && people[0].split(" ").pop() === people[1].split(" ").pop()) {
+      return people[0].split(" ")[0] + " & " + people[1];
+    }
+    return people.join(" & ");
+  }
+  function statusPill(c) {
+    return c.status === "APPROVED" ? pill("delivered", "APPROVED") :
+      blocking(c) ? pill("awaiting_consent", "BROKER REVIEW") : pill("ready", "READY TO APPROVE");
+  }
+  function download(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // ---- navigation ---------------------------------------------------------------------
+  let currentCase = null;
+  function showView(view) {
+    ["portal", "case", "templates", "how"].forEach((v) => $(v + "-view").classList.toggle("hidden", v !== view));
+    document.querySelectorAll(".sidebar-link").forEach((b) =>
+      b.classList.toggle("active", b.dataset.view === view || (view === "case" && b.dataset.view === "portal")));
+    $("page-title").textContent = { portal: "ABC Ltd cases", case: "ABC Ltd cases",
+                                    templates: "Firm templates", how: "How it works" }[view];
+    $("mobile-nav").value = view === "case" ? "portal" : view;
+    if (view === "portal") renderPortal();
+    if (view === "templates") renderTemplates();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll(".sidebar-link").forEach((b) => b.addEventListener("click", () => showView(b.dataset.view)));
+  $("mobile-nav").addEventListener("change", (e) => showView(e.target.value));
+  $("reset-btn").addEventListener("click", () => {
+    state = fresh(); save(); currentCase = null; showView("portal");
+  });
+
+  // ---- case list --------------------------------------------------------------------------
+  function renderPortal() {
+    $("stat-total").textContent = state.cases.length;
+    $("stat-commercial").textContent = state.cases.filter((c) => c.type === "COMMERCIAL").length;
+    $("stat-residential").textContent = state.cases.filter((c) => c.type === "RESIDENTIAL").length;
+    $("stat-open").textContent = state.cases.reduce((s, c) => s + blocking(c), 0);
+    $("case-list").innerHTML = state.cases.map((c, i) => `
+      <tr data-i="${i}">
+        <td>${esc(caseTitle(c))}</td>
+        <td><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span></td>
+        <td>${statusPill(c)}</td>
+        <td>${openFindings(c).length}</td>
+        <td class="mono">${esc(c.reference)}</td>
+        <td>${esc(new Date(c.opened).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</td>
+      </tr>`).join("");
+    document.querySelectorAll("#case-list tr").forEach((tr) =>
+      tr.addEventListener("click", () => openCase(state.cases[+tr.dataset.i])));
+  }
+
+  // ---- case detail ----------------------------------------------------------------------------
+  function openCase(c) { currentCase = c; showView("case"); renderCase(); }
+
+  function figuresHtml(f) {
+    const parts = [];
+    const dateish = /date_of_birth/.test(f.path);
+    const show = (v) => dateish ? esc(v) : gbp(v);
+    if (f.declared) parts.push(`<div><div class="fig-label">Entered</div><div class="fig-value money">${show(f.declared)}</div></div>`);
+    if (f.evidence) parts.push(`<div><div class="fig-label">${esc(SOURCE[f.source] || f.source)} shows</div><div class="fig-value money">${show(f.evidence)}</div></div>`);
+    if (f.proposed !== null && f.proposed !== undefined && f.acceptable) {
+      parts.push(`<div><div class="fig-label">Would become</div><div class="fig-value money new">${show(f.proposed)}</div></div>`);
+    }
+    return parts.length ? `<div class="figures">${parts.join("")}</div>` : "";
+  }
+
+  function findingHtml(f) {
+    const outcome = f.outcome.toLowerCase();
+    let actions = "";
+    if (f.outcome === "DIFFERENCE") {
+      actions = `<div class="inline-form">
+        ${f.acceptable ? `<button class="btn-primary" data-accept="${esc(f.id)}">${f.action === "ADD_COMMITMENT" ? "Add to fact find" : "Customer accepts source figure"}</button>` : ""}
+        <input type="text" placeholder="Why the entered figure stands" data-reason-for="${esc(f.id)}" />
+        <button class="btn-secondary" data-dismiss="${esc(f.id)}">Keep entered</button>
+      </div>`;
+    }
+    return `<div class="panel finding ${outcome}">
+      <div class="finding-head">${pill(outcome, f.outcome === "UNVERIFIABLE" ? "TO CHECK" : f.outcome)}
+        <span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
+      <div class="finding-text">${esc(f.message)}</div>
+      ${figuresHtml(f)}${actions}</div>`;
+  }
+
+  function categorySelect(selected, attr) {
+    const groups = {};
+    D.categories.forEach((c) => { (groups[c.group] = groups[c.group] || []).push(c); });
+    return `<select ${attr}>` + Object.entries(groups).map(([g, cs]) =>
+      `<optgroup label="${esc(g)}">` + cs.map((c) =>
+        `<option value="${esc(c.value)}" ${c.value === selected ? "selected" : ""}>${esc(c.label)}</option>`).join("") +
+      "</optgroup>").join("") + "</select>";
+  }
+
+  function rowHtml(label, value, prov) {
+    const p = prov ? pill((prov.status || "").toLowerCase(), prov.status) : "";
+    return `<div class="row"><span class="label">${esc(label)}</span><span class="value">${value}${p}</span></div>`;
+  }
+
+  function renderCase() {
+    const c = currentCase, ff = c.factfind, data = ff.data, prov = ff.provenance;
+    const open = openFindings(c);
+    const order = { DIFFERENCE: 0, ALERT: 1, UNVERIFIABLE: 2 };
+    open.sort((a, b) => order[a.outcome] - order[b.outcome]);
+
+    // Sources
+    const sources = c.parties.map((p) => {
+      const steps = p.banking_steps;
+      const bank = steps ? `<div class="small" style="margin-top:8px">Open Banking: ${steps.accounts_connected} connection(s) → ${steps.accounts_after_merge} account(s), ${steps.duplicates_removed} duplicate transactions removed, ${steps.transfers_paired || 0} own transfers paired.</div>` : "";
+      const hmrc = p.role === "COMPANY" ? "" :
+        `<div class="small" style="margin-top:6px">HMRC shared: <strong>${esc({ NONE: "not requested", PAYE: "PAYE payroll", SA302: "SA302", BOTH: "PAYE and SA302" }[p.hmrc_scope])}</strong></div>`;
+      return `<div class="detail-block">
+        <div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">· ${esc(p.role.toLowerCase())}</span></div>
+        <div class="source-chips">${p.sources.map((s) => pill("delivered", SOURCE[s] || s)).join("")}
+          ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div>${hmrc}${bank}</div>`;
+    }).join("");
+
+    // Transactions to categorise, one row per merchant
+    const waiting = {};
+    c.transactions.filter((t) => t.category === "UNCATEGORISED").forEach((t) => {
+      const k = t.party + "|" + t.merchant;
+      (waiting[k] = waiting[k] || []).push(t);
+    });
+    const toCategorise = Object.values(waiting).map((ts) => {
+      const t = ts[0];
+      const out = ts.reduce((s, x) => s + Math.max(0, -E.num(x.amount)), 0);
+      return `<div class="panel finding difference">
+        <div class="finding-head">${pill("difference", "TO CATEGORISE")}<span class="finding-source">${esc(t.provider || "No provider category")}</span></div>
+        <div class="finding-text"><strong>${esc(t.description)}</strong> — ${ts.length} payment(s), ${gbp(out)} in total</div>
+        <div class="inline-form">${categorySelect("", `data-cat-for="${esc(t.id)}"`)}
+          <label class="check"><input type="checkbox" data-remember-for="${esc(t.id)}" checked /> remember for this merchant</label>
+          <button class="btn-primary" data-categorise="${esc(t.id)}">Categorise</button></div></div>`;
+    }).join("");
+    const txRows = c.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((t) => `
+      <tr><td class="mono">${esc(t.date)}</td>
+        <td>${esc(t.description)}${t.provider ? `<br><span class="mono muted">${esc(t.provider)}</span>` : ""}</td>
+        <td class="num">${gbp(t.amount)}</td><td>${esc(CAT[t.category] || t.category)}</td>
+        <td>${pill(t.basis === "NONE" ? "difference" : ["OVERRIDE", "MEMORY"].includes(t.basis) ? "verified" : "derived", BASIS[t.basis] || t.basis)}</td></tr>`).join("");
+
+    // Fact find
+    const people = data.applicants.map((a, i) => {
+      const base = `applicants[${i}]`;
+      const inc = ["basic_salary", "bonus", "overtime", "commission", "self_employed_profit"]
+        .filter((f) => E.num(a.income[f]) || prov[`${base}.income.${f}`]?.status !== "DECLARED")
+        .map((f) => rowHtml(f.replace(/_/g, " ").replace(/^./, (x) => x.toUpperCase()) + " (annual)",
+                            `<span class="money">${gbp(a.income[f])}</span>`, prov[`${base}.income.${f}`])).join("");
+      return `<div class="group-title">${esc(a.full_name || "Applicant " + (i + 1))} · ${esc((a.role || "").toLowerCase())}</div>
+        ${rowHtml("Date of birth", esc(a.date_of_birth || "–"), prov[base + ".date_of_birth"])}
+        ${a.employer ? rowHtml("Employer", esc(a.employer), prov[base + ".employer"]) : ""}
+        ${inc}
+        ${a.income.net_monthly ? rowHtml("Net monthly pay", `<span class="money">${gbp(a.income.net_monthly)}</span>`, prov[base + ".income.net_monthly"]) : ""}`;
+    }).join("");
+    const commitments = data.commitments.filter(Boolean).map((r, j) => `
+      <tr><td>${esc(r.owner_name || r.owner)}</td><td>${esc(r.lender)}</td><td>${esc(String(r.type).replace(/_/g, " ").toLowerCase())}</td>
+      <td class="num">${gbp(r.balance)}</td><td class="num">${gbp(r.monthly_payment)}</td>
+      <td>${pill((prov[`commitments[${j}].lender`]?.status || "").toLowerCase(), prov[`commitments[${j}].lender`]?.status || "")}</td></tr>`).join("");
+    const planner = D.groups.map((g) => {
+      const rows = D.lines.filter((l) => l.group === g && E.num(data.expenditure[l.key]))
+        .map((l) => rowHtml(l.label, `<span class="money">${gbp(data.expenditure[l.key])}</span>`, prov["expenditure." + l.key])).join("");
+      return `<div class="group-title">${esc(g)}</div>${rows || '<div class="row"><span class="label">Nothing on these lines</span></div>'}`;
+    }).join("");
+    const s = data.summary;
+    const company = data.company ? `<div class="section"><h2>Company</h2>
+      ${rowHtml("Company", esc(data.company.name), prov["company.name"])}
+      ${rowHtml("Company number", esc(data.company.number), prov["company.number"])}
+      ${rowHtml("Monthly turnover", gbp(data.company.monthly_turnover), prov["company.monthly_turnover"])}
+      ${rowHtml("Monthly outgoings (banked)", gbp(data.company.monthly_outgoings), prov["company.monthly_outgoings"])}</div>` : "";
+
+    const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
+    const matches = c.findings.filter((f) => f.outcome === "MATCH");
+    const audit = ff.audit.slice().reverse().map((e) => `
+      <tr><td class="mono">${esc(String(e.at).slice(0, 16).replace("T", " "))}</td><td>${esc(e.by)}</td>
+        <td class="mono">${esc(e.path)}</td><td class="num">${esc(e.old === null ? "–" : e.old)}</td>
+        <td class="num">${esc(e.new)}</td><td>${esc(SOURCE[e.origin] || e.origin)}</td></tr>`).join("");
+
+    $("case-view").innerHTML = `
+      <button class="back-link" id="case-back">&larr; Back to ABC Ltd cases</button>
+      <div class="detail-head"><div>
+        <div class="eyebrow muted">${esc(c.reference)}</div>
+        <h1 class="title">${esc(caseTitle(c))}</h1></div>${statusPill(c).replace("status-pill", "status-pill lg")}</div>
+      <dl class="detail-grid">
+        <dt>Category</dt><dd>${esc(c.type.toLowerCase())}</dd>
+        <dt>Adviser</dt><dd>${esc(c.adviser)}</dd>
+        <dt>Opened</dt><dd>${esc(new Date(c.opened).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }))}</dd>
+      </dl>
+
+      <div class="section"><h2>Sources</h2>${sources}</div>
+
+      <div class="section"><h2>To decide<span class="count">${open.length} open</span></h2>
+        ${open.map(findingHtml).join("") || '<div class="panel">Nothing left to decide.</div>'}
+        ${decided.length ? `<details class="payments-detail"><summary>Decided (${decided.length})</summary>
+          ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept the entered figure"} · ${esc(f.decision.by)}</div>
+            <div class="small">${esc(f.message)}${f.decision.reason ? `<br><em>“${esc(f.decision.reason)}”</em>` : ""}</div></div>`).join("")}</details>` : ""}
+        ${matches.length ? `<details class="payments-detail"><summary>Confirmed by a source (${matches.length})</summary>
+          ${matches.map((f) => `<div class="row"><span class="label">${esc(SOURCE[f.source] || f.source)}</span><span class="value" style="font-weight:400">${esc(f.message)}</span></div>`).join("")}</details>` : ""}
+      </div>
+
+      ${c.transactions.length ? `<div class="section"><h2>Bank transactions<span class="count">${c.transactions.length} placed on budget lines</span></h2>
+        <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which.</p>
+        ${toCategorise}
+        <details class="payments-detail"><summary>All transactions — and how each was placed</summary>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th></tr></thead>
+          <tbody>${txRows}</tbody></table></div></details></div>` : ""}
+
+      <div class="section"><h2>Fact find</h2>${people}</div>
+      ${company}
+      <div class="section"><h2>Commitments</h2>
+        ${commitments ? `<div class="table-wrap"><table><thead><tr><th>Whose</th><th>Lender</th><th>Type</th><th class="num">Balance</th><th class="num">Monthly</th><th>Status</th></tr></thead><tbody>${commitments}</tbody></table></div>` : '<p class="small">None.</p>'}
+      </div>
+      <div class="section"><h2>Budget planner <span class="count">C2C Mortgage Expenditure Form</span></h2>${planner}</div>
+      <div class="section"><h2>Summary</h2>
+        ${rowHtml("Total committed", gbp(s.total_committed))}
+        ${rowHtml("Total basic essential", gbp(s.total_essential))}
+        ${rowHtml("Total basic quality of living", gbp(s.total_quality))}
+        ${rowHtml("Total outgoings", `<strong>${gbp(s.monthly_expenditure)}</strong>`)}
+        ${rowHtml("Household gross income (annual)", gbp(s.gross_annual_income))}
+        ${rowHtml("Net monthly income", gbp(s.net_monthly_income))}
+        ${rowHtml("Disposable income (monthly, net pay less outgoings other than tax)", `<strong>${gbp(s.disposable_monthly)}</strong>`)}
+      </div>
+
+      <div class="section"><h2>Outputs</h2>
+        <div class="panel"><p>The C2C Mortgage Expenditure Form, filled from this fact find — its own lines, detail tabs and totals — plus C2C's checks and audit sheets.</p>
+          <div class="panel-actions">
+            <button class="btn-primary" id="dl-standard">Download the expenditure form (Excel)</button>
+            <button class="btn-secondary" id="approve-btn" ${blocking(c) || c.status === "APPROVED" ? "disabled" : ""}>${c.status === "APPROVED" ? "Approved" : "Approve fact find"}</button>
+          </div>
+          <p class="note">${blocking(c) ? `Approve is available once the ${blocking(c)} difference(s) above have a decision.` : ""}</p></div>
+      </div>
+
+      <div class="section"><h2>Audit trail</h2>
+        ${audit ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th class="num">Was</th><th class="num">Now</th><th>From</th></tr></thead><tbody>${audit}</tbody></table></div>`
+                : '<p class="small">No changes yet. Accepting a figure or categorising a transaction records it here.</p>'}
+      </div>
+      <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real affordability assessment.</p>`;
+
+    $("case-back").addEventListener("click", () => showView("portal"));
+    document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
+      E.accept(c, b.dataset.accept, WHO, D.lines); save(); renderCase();
+    }));
+    document.querySelectorAll("[data-dismiss]").forEach((b) => b.addEventListener("click", () => {
+      const input = document.querySelector(`[data-reason-for="${CSS.escape(b.dataset.dismiss)}"]`);
+      if (!input.value.trim()) { input.focus(); input.placeholder = "A reason is needed for the audit trail"; return; }
+      E.dismiss(c, b.dataset.dismiss, WHO, input.value.trim()); save(); renderCase();
+    }));
+    document.querySelectorAll("[data-categorise]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.dataset.categorise;
+      const cat = document.querySelector(`[data-cat-for="${CSS.escape(id)}"]`).value;
+      const remember = document.querySelector(`[data-remember-for="${CSS.escape(id)}"]`).checked;
+      E.recategorise(state.cases, c, id, cat, remember, WHO, D); save(); renderCase();
+    }));
+    $("dl-standard").addEventListener("click", () => downloadStandard(c));
+    $("approve-btn").addEventListener("click", () => {
+      c.status = "APPROVED";
+      c.factfind.audit.push({ at: new Date().toISOString(), by: WHO, path: "fact find", old: null,
+                              new: "approved", origin: "BROKER", status: "APPROVED", reason: "" });
+      save(); renderCase();
+    });
+  }
+
+  // ---- Excel ----------------------------------------------------------------------------------
+  async function fetchBuffer(name) {
+    const r = await fetch(name);
+    if (!r.ok) throw new Error("Could not load " + name);
+    return r.arrayBuffer();
+  }
+  // ExcelJS drops links between tabs when it reads a workbook; the form's
+  // "click here" links are put back.
+  const FORM_LINKS = { "Expenditure!C9": "'Credit Card Dets'!A1", "Expenditure!C10": "'Car Loan Dets'!A1",
+                       "Expenditure!C11": "'Personal or Student Loan Dets'!A1",
+                       "Expenditure!C12": "'Personal or Student Loan Dets'!A1",
+                       "Credit Card Dets!A14": "Expenditure!A1", "Personal or Student Loan Dets!A18": "Expenditure!A1",
+                       "Car Loan Dets!A13": "Expenditure!A1" };
+  async function downloadStandard(c) {
+    const btn = $("dl-standard"); btn.disabled = true; btn.textContent = "Filling the form…";
+    try {
+      const rendered = E.render(D.standard_mapping, c.factfind.data, D.lines);
+      const wb = await E.fillWorkbook(window.ExcelJS, await fetchBuffer("expenditure_form.xlsx"), rendered);
+      Object.entries(FORM_LINKS).forEach(([at, to]) => {
+        const i = at.lastIndexOf("!"); const cell = wb.getWorksheet(at.slice(0, i)).getCell(at.slice(i + 1));
+        cell.value = { text: String(cell.value && cell.value.text || cell.value || ""), hyperlink: "#" + to };
+      });
+      E.addC2CSheets(wb, c);
+      download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} C2C expenditure form.xlsx`);
+    } catch (e) { alert("Could not fill the form: " + e.message); }
+    btn.disabled = false; btn.textContent = "Download the expenditure form (Excel)";
+  }
+
+  // ---- templates -------------------------------------------------------------------------------
+  const COMMITMENT_FIELDS = ["owner_name", "lender", "type", "account_number", "credit_limit",
+                             "original_balance", "balance", "start_date", "term_months",
+                             "monthly_payment", "repay_on_completion"];
+  const FORMATS = { money: "money", date: "date:%d/%m/%Y", bool: "yesno" };
+
+  function pathSelect(current, attr) {
+    const groups = {};
+    D.catalogue.forEach((r) => {
+      const g = r.section || r.path.split(".")[0].split("[")[0].replace(/^./, (x) => x.toUpperCase());
+      (groups[g] = groups[g] || []).push(r);
+    });
+    return `<select class="template-select" ${attr}><option value="">– leave blank –</option>` +
+      Object.entries(groups).map(([g, rs]) => `<optgroup label="${esc(g)}">` + rs.map((r) =>
+        `<option value="${esc(r.path)}" ${r.path === current ? "selected" : ""}>${esc(r.label)}</option>`).join("") +
+        "</optgroup>").join("") + "</select>";
+  }
+
+  function renderTemplates() {
+    const t = state.template;
+    const view = $("templates-view");
+    if (!t) {
+      view.innerHTML = `
+        <div class="eyebrow muted">Firm templates</div>
+        <h1 class="title">Fill the firm's own forms</h1>
+        <p class="subtitle" style="max-width:640px">Firms don't have an API — they have their own fact finds, budget sheets and lender forms. C2C reads a blank template's layout, proposes where each figure goes, and a person approves it. From then on every case fills it.</p>
+        <div class="panel">
+          <p><strong>Example: Acme Brokers budget sheet</strong> — a firm's own Excel sheet, worded differently from ours (“Gas &amp; electric”, “Food shopping”, “Client 1 surname”) with its own credit card tab and total formula.</p>
+          <div class="panel-actions">
+            <button class="btn-primary" id="read-template">Read this template</button>
+            <a class="btn-secondary" href="acme-budget-sheet.xlsx" download style="text-decoration:none">Download the blank template</a>
+          </div>
+        </div>
+        <div class="demo-control"><div class="demo-control-label">Demo note &mdash; not part of the product</div>
+          <p class="small" style="margin:0">The live service reads any PDF or Excel a firm uploads. This static demo carries one example, read in advance by the same code.</p></div>`;
+      $("read-template").addEventListener("click", () => {
+        view.innerHTML = `<div class="spinner-row" style="padding:40px 0"><span class="spinner"></span><h2 class="processing-title">Reading the template layout…</h2></div>`;
+        setTimeout(() => {
+          state.template = { saved: false, fields: JSON.parse(JSON.stringify(D.acme.fields)),
+                             repeats: JSON.parse(JSON.stringify(D.acme.mapping.repeats)) };
+          save(); renderTemplates();
+        }, 900);
+      });
+      return;
+    }
+
+    const placed = t.fields.filter((f) => f.path).length;
+    const byRules = t.fields.filter((f) => f.basis === "NAME" && f.path).length;
+    view.innerHTML = `
+      <div class="eyebrow muted">Firm templates · Acme Brokers budget sheet</div>
+      <h1 class="title">Review the proposed mapping</h1>
+      <p class="subtitle" style="max-width:640px">Every field in the template, and where C2C proposes to fill it from. Change any drop-down, then save. ${t.saved ? "<strong>Saved.</strong>" : ""}</p>
+      <div class="stat-row">
+        <div class="stat-box teal"><div class="stat-value">${byRules}</div><div class="stat-label">Placed by rules</div></div>
+        <div class="stat-box"><div class="stat-value">${placed - byRules}</div><div class="stat-label">Placed by you</div></div>
+        <div class="stat-box brand"><div class="stat-value">${t.fields.length - placed}</div><div class="stat-label">Left blank</div></div>
+      </div>
+      <p class="note-box">The rules only place a field when the label (and any definition next to it) clearly means the same thing — and never guess. <strong>In the live service, AI proposes the rest</strong>: it sees the blank template's layout only, never customer data, and a person approves every proposal before it is used.</p>
+      <div class="section"><h2>Fields</h2><div class="table-wrap"><table>
+        <thead><tr><th>Cell</th><th>In their template</th><th>Proposed by</th><th>Fills from the fact find</th></tr></thead>
+        <tbody>${t.fields.map((f, i) => `<tr>
+          <td class="mono">${esc(f.target)}</td>
+          <td>${esc(f.label)}${f.definition ? `<br><span class="small">${esc(f.definition)}</span>` : ""}${f.section ? `<br><span class="mono small">${esc(f.section)}</span>` : ""}</td>
+          <td>${f.basis === "NAME" && f.path ? pill("verified", "RULES") : f.path ? pill("prefilled", "YOU") : pill("declared", "BLANK")}</td>
+          <td>${pathSelect(f.path, `data-field="${i}"`)}</td></tr>`).join("")}</tbody></table></div></div>
+      <div class="section"><h2>Tables</h2>${t.repeats.map((r, i) => `
+        <div class="detail-block"><div class="detail-block-header">${esc((D.lines.find((l) => l.key === r.line) || {}).label || r.line)} · one row per commitment, from row ${r.start_row}, up to ${r.max} rows</div>
+          <table>${r.fields.map((col, j) => `<tr><td class="mono">${esc(col.target)}</td><td>
+            <select data-rep="${i}" data-col="${j}"><option value="">– leave blank –</option>${COMMITMENT_FIELDS.map((p) =>
+              `<option value="${p}" ${p === col.path ? "selected" : ""}>${p.replace(/_/g, " ")}</option>`).join("")}</select></td></tr>`).join("")}</table></div>`).join("")}</div>
+      <div class="actions"><button class="btn-primary" id="save-mapping">Save mapping</button>
+        <button class="btn-secondary" id="start-over">Start over</button></div>
+      ${t.saved ? `<div class="section" style="margin-top:28px"><h2>Fill it for a case</h2>
+        <div class="inline-form"><select id="fill-case">${state.cases.map((c, i) =>
+          `<option value="${i}">${esc(caseTitle(c))} · ${esc(c.reference)}</option>`).join("")}</select>
+          <button class="btn-primary" id="fill-template">Fill and download</button></div>
+        <p class="section-note" style="margin-top:10px">Uses the case as it stands now, including any figures accepted on the case screen.</p></div>` : ""}`;
+
+    document.querySelectorAll("[data-field]").forEach((s) => s.addEventListener("change", () => {
+      const f = t.fields[+s.dataset.field];
+      if (f.basis === "NAME" && s.value !== f.path) f.basis = null;
+      f.path = s.value || null; t.saved = false; save(); renderTemplates();
+    }));
+    document.querySelectorAll("[data-rep]").forEach((s) => s.addEventListener("change", () => {
+      t.repeats[+s.dataset.rep].fields[+s.dataset.col].path = s.value; t.saved = false; save();
+    }));
+    $("save-mapping").addEventListener("click", () => { t.saved = true; save(); renderTemplates(); });
+    $("start-over").addEventListener("click", () => { state.template = null; save(); renderTemplates(); });
+    if (t.saved) $("fill-template").addEventListener("click", () => fillTemplate(state.cases[+$("fill-case").value]));
+  }
+
+  async function fillTemplate(c) {
+    const t = state.template, btn = $("fill-template");
+    const kinds = {}; D.catalogue.forEach((r) => { kinds[r.path] = r.kind; });
+    const mapping = {
+      fields: t.fields.filter((f) => f.path).map((f) => ({ target: f.target, path: f.path, format: FORMATS[kinds[f.path]] })),
+      repeats: t.repeats.map((r) => ({ ...r, fields: r.fields.filter((col) => col.path).map((col) => ({
+        ...col, format: { monthly_payment: "money", balance: "money", credit_limit: "money", original_balance: "money",
+                          start_date: "date:%d/%m/%Y", repay_on_completion: "yesno" }[col.path] })) })),
+    };
+    btn.disabled = true; btn.textContent = "Filling…";
+    try {
+      const wb = await E.fillWorkbook(window.ExcelJS, await fetchBuffer("acme-budget-sheet.xlsx"),
+                                      E.render(mapping, c.factfind.data, D.lines));
+      download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} Acme Brokers budget sheet.xlsx`);
+    } catch (e) { alert("Could not fill the template: " + e.message); }
+    btn.disabled = false; btn.textContent = "Fill and download";
+  }
+
+  showView("portal");
+})();
+</script>
+</body>
+</html>
