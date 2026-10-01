@@ -258,7 +258,10 @@
     const values = [], missing = [];
     (mapping.fields || []).forEach((s) => {
       let v;
-      if ("value" in s) {
+      if (s.sum) {
+        // Several lines into one cell, e.g. a firm's "Gas & electric".
+        v = money2(s.sum.reduce((t, p) => t + num(getPath(data, p, 0)), 0));
+      } else if ("value" in s) {
         v = s.value.replace(/\{([^{}]+)\}/g, (_, p) => getPath(data, p, "") || "").replace(/\s+/g, " ").trim();
       } else v = getPath(data, s.path, null);
       if (v === null || v === "") missing.push(s.target);
@@ -306,8 +309,130 @@
     audit.getRow(1).font = { bold: true };
   }
 
+  // --- cases from the exported variants ---------------------------------------------
+  // A case is one precomputed engine run (the variant for the HMRC choices
+  // made) plus what does not depend on those choices.
+  function makeCase(def, variantKey, extra) {
+    const v = def.variants[variantKey || def.default_variant];
+    const c = JSON.parse(JSON.stringify({
+      id: def.id, reference: def.reference, type: def.type, adviser: def.adviser,
+      opened: def.opened, company: def.company, people: def.people,
+      variant: variantKey || def.default_variant,
+      parties: v.parties, factfind: v.factfind, findings: v.findings, pack: v.pack,
+      transactions: def.transactions, months: def.months, accounts: def.accounts,
+    }));
+    c.status = "REVIEW";
+    Object.assign(c, extra || {});
+    c.baseline = JSON.parse(JSON.stringify(c.factfind.data));
+    return c;
+  }
+
+  // Put the presenter's names in place of the sample's. The figures are the
+  // sample's either way -- the same as the HMRC demo, which returns one fixed
+  // test record whatever is entered.
+  function rename(c, names) {
+    const swaps = [];
+    if (names.company && c.company) swaps.push([c.company, names.company]);
+    c.people.forEach((p, i) => {
+      const n = names.people[i];
+      if (!n || !n.first || !n.last) return;
+      const [first, ...rest] = p.name.split(" ");
+      const last = rest.join(" ");
+      const alias = first === "Tom" ? "Thomas" : null;    // the credit file's spelling
+      swaps.push([p.name, `${n.first} ${n.last}`]);
+      if (alias) swaps.push([`${alias} ${last}`, `${n.first} ${n.last}`], [alias, n.first]);
+      swaps.push([first, n.first]);
+    });
+    const firstLast = names.people[0] && names.people[0].last;
+    const oldLast = c.people[0].name.split(" ").slice(1).join(" ");
+    if (firstLast && oldLast) swaps.push([oldLast, firstLast]);
+    let text = JSON.stringify(c);
+    swaps.forEach(([from, to]) => {
+      text = text.replace(new RegExp("\\b" + from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "g"),
+                          to.replace(/\$/g, "$$$$"));
+    });
+    const out = JSON.parse(text);
+    names.people.forEach((n, i) => {
+      const a = out.factfind.data.applicants[i];
+      if (a && n && n.last) { a.last_name = n.last; a.full_name = `${n.first} ${n.last}`; }
+    });
+    return out;
+  }
+
+  // --- at a glance --------------------------------------------------------------------
+  const BACKED = ["VERIFIED", "REPLACED", "ADDED"];
+  function glance(c) {
+    const ff = c.factfind, s = ff.data.summary;
+    let backed = 0, total = 0;
+    Object.entries(ff.provenance).forEach(([path, p]) => {
+      if (p.status === "DERIVED" || !/^(applicants\[\d+\]\.income|expenditure|commitments)/.test(path)) return;
+      if (/\.(owner|owner_name|type|account_number|repay_on_completion|start_date|term_months|lender|credit_limit|original_balance)$/.test(path)) return;
+      if (!num(getPath(ff.data, path, 0))) return;
+      total += 1;
+      if (BACKED.includes(p.status) || (p.status === "PREFILLED" && p.origin !== "CUSTOMER")) backed += 1;
+    });
+    return {
+      disposable: num(s.disposable_monthly), outgoings: num(s.monthly_expenditure),
+      net: num(s.net_monthly_income), gross: num(s.gross_annual_income),
+      backed: backed, total: total,
+      differences: c.findings.filter((f) => !f.decision && f.outcome === "DIFFERENCE").length,
+      alerts: c.findings.filter((f) => !f.decision && f.outcome === "ALERT").length,
+    };
+  }
+
+  // Each figure that changed since the customer's entry: first value, now.
+  // A commitment added from the credit file is one row, not one per field.
+  function changes(c) {
+    const seen = {};
+    c.factfind.audit.forEach((e) => {
+      const added = e.status === "ADDED" && /^commitments\[(\d+)\]\./.exec(e.path);
+      const path = added ? `commitments[${added[1]}]` : e.path;
+      if (!/^(applicants|expenditure|commitments|company)/.test(path)) return;
+      if (!(path in seen)) seen[path] = { path: path, was: added ? null : e.old, added: !!added };
+      seen[path].origin = e.origin; seen[path].by = e.by;
+    });
+    return Object.values(seen).map((x) => {
+      if (x.added) {
+        const row = getPath(c.factfind.data, x.path, {});
+        const kind = String(row.type || "").replace(/_/g, " ").toLowerCase();
+        return { ...x, label: `Commitment added: ${row.lender} ${kind}`.trim(), now: row.monthly_payment };
+      }
+      return { ...x, now: getPath(c.factfind.data, x.path, null) };
+    }).filter((x) => x.added || String(x.was) !== String(x.now));
+  }
+
+  // --- the customer's side ---------------------------------------------------------------
+  function customerAnswer(c, findingId, agrees, customer, reason, lines) {
+    const who = `${customer} (customer)`;
+    return agrees ? accept(c, findingId, who, lines)
+                  : dismiss(c, findingId, who, reason || "Customer disagreed");
+  }
+
+  // --- the C2C Data Pack, as it stands now ------------------------------------------------
+  function dataPack(c, lines) {
+    const pack = JSON.parse(JSON.stringify(c.pack));
+    pack.generated = new Date().toISOString();
+    pack.reference = c.reference;
+    pack.parties.forEach((p) => {
+      if (!p.banking) return;
+      const mine = c.transactions.filter((t) => t.party === p.key);
+      const only = { ...c, transactions: mine, months: { [p.key]: c.months[p.key] || [] } };
+      const bank = bankLines(only);
+      p.banking.planner = {};
+      lines.filter((l) => !l.commitment_types.length).forEach((l) => {
+        if (bank.lines[l.key]) p.banking.planner[l.key] = money2(bank.lines[l.key]);
+      });
+      p.banking.monthly_by_category = Object.fromEntries(
+        Object.entries(bank.byCat).map(([k, v]) => [k, money2(v)]));
+      p.banking.accounts = (c.accounts[p.key] || {}).accounts;
+      p.banking.transactions = mine.map(({ party, ...t }) => t);
+    });
+    return pack;
+  }
+
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
-                bankLines, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num };
+                bankLines, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
+                makeCase, rename, glance, changes, customerAnswer, dataPack };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);
