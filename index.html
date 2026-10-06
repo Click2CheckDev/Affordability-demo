@@ -436,6 +436,7 @@
   .progress-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f2; color: var(--ink); font-size: 14px; }
   .progress-list li .what { flex: 1; }
   .progress-list li .what .small { display: block; color: var(--muted); }
+  .hub-tick { color: var(--teal); font-weight: 700; }
   .progress-list .tick { width: 20px; height: 20px; border-radius: 50%; background: var(--teal); color: #fff;
                          display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
   .progress-list .wait { width: 20px; height: 20px; border-radius: 50%; border: 2px dashed var(--border-strong); flex-shrink: 0; }
@@ -514,7 +515,7 @@
       <div>
         <div class="eyebrow muted">Affordability</div>
         <h1 class="title" style="font-size:26px;">ABC Ltd</h1>
-        <p class="subtitle">Each case brings the customer's credit file, Open Banking, AML, ID and HMRC data together, checks them against what the customer entered, and fills the fact find and budget planner.</p>
+        <p class="subtitle">Each case brings the customer's credit report and Open Banking together, checks them against what the customer entered, and fills the fact find and budget planner.</p>
       </div>
     </div>
     <div class="stat-row four">
@@ -549,15 +550,24 @@
     <h1 class="title">One layer between the customer, the adviser and the forms</h1>
     <p class="subtitle" style="max-width:640px">C2C doesn't just collect reports. It checks them against each other and against the customer, then fills whichever form the firm uses.</p>
     <ol class="flow">
-      <li><strong>Collect.</strong> Credit file, Open Banking (several banks), AML, ID check. HMRC is optional: the customer chooses PAYE, SA302 or both, in one consent journey (see the <a href="https://click2checkdev.github.io/HMRC-demo/" target="_blank" rel="noopener">HMRC demo</a>).</li>
+      <li><strong>Start from the hub.</strong> Affordability starts once the hub has each person's credit report and Open Banking (several banks). That is all it needs, and the case opens with both.</li>
       <li><strong>Open Banking aggregate.</strong> Accounts connected twice are merged, overlapping feeds de-duplicated, transfers between the customer's own accounts paired, and every transaction placed on a budget planner line. <span class="tag code">RULES · ACCOUNTSCORE MAP · MERCHANT MEMORY · TRAINED MODEL</span></li>
-      <li><strong>C2C Data Pack.</strong> Every party's credit, banking, AML and ID in one file. Residential and commercial use the same model; a commercial case adds the company, and each director gets the same personal checks.</li>
-      <li><strong>Validate.</strong> What the customer entered is compared with every source: salary and bonus against HMRC payroll, profit against SA302, commitments against the credit file, spending against the bank. Differences are flagged, not changed.</li>
-      <li><strong>Broker and customer decide.</strong> The customer confirms or disputes each change on their own screen, or the broker records it. Every decision goes on the audit trail. <span class="tag code">NO AI ON A CASE</span></li>
+      <li><strong>C2C Data Pack.</strong> Every party's credit report and banking in one file. Residential and commercial use the same model; a commercial case adds the company, and each director gets the same personal checks.</li>
+      <li><strong>Validate.</strong> What the customer entered is compared with both sources: income against pay into the bank, commitments against the credit report and the bank, spending against the bank. Differences are flagged, not changed.</li>
+      <li><strong>Broker and customer decide.</strong> The hub sends the customer a link; they open it without signing in and confirm or dispute each change. The broker records the rest. Every decision goes on the audit trail, with who made it. <span class="tag code">NO AI ON A CASE</span></li>
       <li><strong>Fact find and budget planner.</strong> Populated and validated, on the lines of the C2C Mortgage Expenditure Form, with where each figure came from.</li>
       <li><strong>Fill any template.</strong> The C2C form, or the firm's or lender's own PDF, Excel or form fields. AI proposes how a new template maps; a person approves it once, and from then on it fills every case. <span class="tag ai">AI PROPOSES · PERSON APPROVES</span></li>
+      <li><strong>Back to the hub.</strong> The hub is told when the case opens, when the customer answers, when the broker approves, and when a form or case report is ready. Each notice is signed and carries no personal data; the hub fetches the case with its own key.</li>
     </ol>
-    <p class="note-box"><strong>What's real in this demo:</strong> every figure, check and difference was produced by the affordability engine from fictional sample reports, including each HMRC choice on a new case. Your clicks replay decisions in the browser, and the Excel and PDF files are filled in the browser from the same mapping files the service uses. <strong>What isn't:</strong> the reports are made up, nothing is sent anywhere, and the AI mapping answers are simulated for the demo.</p>
+    <div class="panel">
+      <p style="margin:0 0 6px"><strong>Later, in the C2C hub.</strong> Affordability will sit in the hub alongside the other checks, which run on the same case but are not part of affordability:</p>
+      <ul style="margin:0">
+        <li><strong>AML</strong>: internal, for the business. It needs no consent and nothing is sent out.</li>
+        <li><strong>ID check</strong>: sent to the customer, and may not be needed.</li>
+        <li><strong>HMRC</strong>: when it is added (see the <a href="https://click2checkdev.github.io/HMRC-demo/" target="_blank" rel="noopener">HMRC demo</a>). The service can already check income against PAYE and SA302 once the hub supplies them.</li>
+      </ul>
+    </div>
+    <p class="note-box"><strong>What's real in this demo:</strong> every figure, check and difference was produced by the affordability engine from fictional sample reports. Your clicks replay decisions in the browser, and the Excel and PDF files are filled in the browser from the same mapping files the service uses. <strong>What isn't:</strong> the reports are made up, nothing is sent anywhere, and the AI mapping answers are simulated for the demo.</p>
   </div>
 
 </main>
@@ -582,7 +592,6 @@
   const BASIS = { RULE: "Rule", PROVIDER: "AccountScore category", MEMORY: "Merchant memory",
                   OVERRIDE: "Broker", PATTERN: "Regular pay", MODEL: "Trained model",
                   MATCHED_TRANSFER: "Own transfer", NONE: "Needs a broker" };
-  const HMRC_CHOICE = { NONE: "Not shared", PAYE: "PAYE payroll", SA302: "SA302", BOTH: "PAYE and SA302" };
   const CAT = {}; D.categories.forEach((c) => { CAT[c.value] = c.label; });
   CAT.TRANSFER = "Own transfer"; CAT.UNCATEGORISED = "Not yet categorised";
   const LABEL = {}; D.catalogue.forEach((r) => { LABEL[r.path] = r.label; });
@@ -682,44 +691,36 @@
   }
 
   // ---- new case ---------------------------------------------------------------------------
-  function hmrcSelect(id) {
-    return `<select id="${id}">${Object.entries(HMRC_CHOICE).map(([v, l]) =>
-      `<option value="${v}" ${v === "BOTH" ? "selected" : ""}>${esc(v === "NONE" ? "Not shared" : l)}</option>`).join("")}</select>`;
-  }
   function renderNewCase() {
     const view = $("new-view");
     view.innerHTML = `
       <div class="eyebrow">New case</div>
       <h1 class="title">Open an affordability case</h1>
-      <p class="subtitle">C2C requests every report and sends the customer one link for the parts only they can do: connecting their banks and, if they choose, sharing HMRC data.</p>
+      <p class="subtitle">Affordability starts after the hub has each person's credit report and Open Banking, so the case opens with both and is checked straight away.</p>
       <div class="grid">
         <div class="field span2"><label>Category</label>
           <select id="nc-type"><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select></div>
         <div class="field span2 hidden" id="nc-company-row"><label>Company name</label><input id="nc-company" placeholder="Jones Plumbing Ltd" /></div>
         <div class="field"><label id="nc-p1-label">Applicant 1 first name</label><input id="nc-p1-first" placeholder="Sarah" /></div>
         <div class="field"><label>Last name</label><input id="nc-p1-last" placeholder="Jones" /></div>
-        <div class="field span2"><label>HMRC data <span id="nc-p1-who" style="font-weight:400;color:var(--muted)">(applicant 1)</span></label>${hmrcSelect("nc-p1-hmrc")}
-          <span class="field-hint">The customer's choice, made in one consent journey. PAYE checks salary, bonus and overtime against payroll; SA302 checks self-employed profit.</span></div>
         <div class="field" id="nc-p2-a"><label>Applicant 2 first name</label><input id="nc-p2-first" placeholder="Tom" /></div>
         <div class="field" id="nc-p2-b"><label>Last name</label><input id="nc-p2-last" placeholder="Jones" /></div>
-        <div class="field span2" id="nc-p2-c"><label>HMRC data <span style="font-weight:400;color:var(--muted)">(applicant 2)</span></label>${hmrcSelect("nc-p2-hmrc")}</div>
       </div>
       <div class="panel">
-        <p><strong>Requested for every person:</strong> credit file, Open Banking, AML search and ID check. <span id="nc-company-sources" class="hidden">For the company: company credit report, company Open Banking and company AML.</span></p>
+        <p><strong>From the hub, for every person:</strong> <span class="hub-tick">✓</span> Credit report &nbsp; <span class="hub-tick">✓</span> Open Banking <span id="nc-company-sources" class="hidden"><br><strong>For the company:</strong> <span class="hub-tick">✓</span> Company credit report &nbsp; <span class="hub-tick">✓</span> Business Open Banking</span></p>
       </div>
       <div class="demo-control">
         <div class="demo-control-label">Demo control &mdash; not part of the product</div>
-        <p class="small" style="margin:0">The case uses the sample reports with your names, as the HMRC demo uses fixed test data. The HMRC choice is real: each option is a separate run of the engine, so the checks you see are the ones the service would make.</p>
+        <p class="small" style="margin:0">The case uses the sample reports with your names, as the HMRC demo uses fixed test data. The checks you see are the ones the service makes on those reports.</p>
       </div>
-      <button class="btn-primary" id="nc-submit">Request reports</button>`;
+      <button class="btn-primary" id="nc-submit">Open the case</button>`;
     const type = $("nc-type");
     const sync = () => {
       const com = type.value === "COMMERCIAL";
       $("nc-company-row").classList.toggle("hidden", !com);
       $("nc-company-sources").classList.toggle("hidden", !com);
-      ["nc-p2-a", "nc-p2-b", "nc-p2-c"].forEach((id) => $(id).classList.toggle("hidden", com));
+      ["nc-p2-a", "nc-p2-b"].forEach((id) => $(id).classList.toggle("hidden", com));
       $("nc-p1-label").textContent = com ? "Director first name" : "Applicant 1 first name";
-      $("nc-p1-who").textContent = com ? "(director)" : "(applicant 1)";
       $("nc-p1-first").placeholder = com ? "Tom" : "Sarah";
     };
     type.addEventListener("change", sync); sync();
@@ -736,8 +737,7 @@
       .filter(([, v]) => !v);
     if (missing.length) { $(missing[0][0]).focus(); $(missing[0][0]).style.borderColor = "var(--brand)"; return; }
     const def = D.cases[com ? 1 : 0];
-    const scopes = com ? [$("nc-p1-hmrc").value] : [$("nc-p1-hmrc").value, $("nc-p2-hmrc").value];
-    const variant = def.people.map((p, i) => `${p.key}=${scopes[i]}`).join(",");
+    const variant = def.default_variant;
     const n = ++state.next;
     const reference = `C2C-DEMO-${com ? "COM" : "RES"}-${String(n).padStart(3, "0")}`;
     let c = E.makeCase(def, variant, { reference: reference, id: reference,
@@ -745,51 +745,15 @@
     c = E.rename(c, { company: com ? val("nc-company") : null, people: com ? [p1] : [p1, p2] });
     c.reference = reference; c.id = reference;
     c.baseline = JSON.parse(JSON.stringify(c.factfind.data));
-    c.status = "COLLECTING";
+    c.status = "REVIEW";
     state.cases.unshift(c); save();
-    renderCollecting(c);
-  }
-
-  function renderCollecting(c) {
-    const people = c.factfind.data.applicants;
-    const hmrc = c.parties.filter((p) => p.role !== "COMPANY" && p.hmrc_scope !== "NONE");
-    const items = [
-      { id: "credit", what: "Credit files", note: "Equifax", auto: 500 },
-      { id: "aml", what: "AML searches", note: "Equifax", auto: 900 },
-      { id: "idv", what: "ID checks", note: "Document and liveness", auto: 1300 },
-      { id: "ob", what: "Open Banking", note: `Link sent to ${people.map((a) => a.first_name).join(" and ")}; they connect their banks`, customer: "Simulate the customer connecting their banks" },
-    ];
-    if (hmrc.length) items.push({ id: "hmrc", what: "HMRC", note: hmrc.map((p) => `${p.name}: ${HMRC_CHOICE[p.hmrc_scope]}`).join(" · ") + " — consent link sent", customer: "Simulate the customer consenting at HMRC" });
-    const done = new Set();
-    const view = $("new-view");
-    const draw = () => {
-      const allDone = items.every((i) => done.has(i.id));
-      view.innerHTML = `
-        <div class="eyebrow muted">${esc(c.reference)}</div>
-        <h1 class="title">Collecting reports</h1>
-        <p class="subtitle">${esc(caseTitle(c))} · ${esc(c.type.toLowerCase())}</p>
-        <ul class="progress-list">${items.map((i) => `<li>
-          ${done.has(i.id) ? '<span class="tick">✓</span>' : i.customer ? '<span class="wait"></span>' : '<span class="spinner"></span>'}
-          <span class="what">${esc(i.what)}<span class="small">${esc(i.note)}</span></span>
-          ${done.has(i.id) ? pill("delivered", "RECEIVED") : i.customer ? `<button class="btn-secondary" data-sim="${i.id}" style="padding:7px 12px;font-size:12.5px">${esc(i.customer)}</button>` : pill("polling", "REQUESTED")}
-        </li>`).join("")}</ul>
-        ${hmrc.length ? '<p class="note-box">The HMRC consent step is the one shown in the <a href="https://click2checkdev.github.io/HMRC-demo/" target="_blank" rel="noopener">HMRC demo</a>: the customer signs in through GOV.UK and approves the request.</p>' : ""}
-        <button class="btn-primary" id="nc-open" ${allDone ? "" : "disabled"}>${allDone ? "Build the Data Pack and open the case" : "Waiting for the customer"}</button>
-        <p class="demo-note">The buttons stand in for what the customer does in their own time — minutes or hours later, not seconds.</p>`;
-      view.querySelectorAll("[data-sim]").forEach((b) => b.addEventListener("click", () => { done.add(b.dataset.sim); draw(); }));
-      if (allDone) $("nc-open").addEventListener("click", () => {
-        view.innerHTML = `<div class="spinner-row" style="padding:40px 0"><span class="spinner"></span><h2 class="processing-title">Building the C2C Data Pack and checking the figures…</h2></div>`;
-        setTimeout(() => { c.status = "REVIEW"; save(); openCase(c); }, 1100);
-      });
-    };
-    showView("new"); draw();
-    items.filter((i) => i.auto).forEach((i) => setTimeout(() => { done.add(i.id); if (!$("new-view").classList.contains("hidden")) draw(); }, i.auto));
+    $("new-view").innerHTML = `<div class="spinner-row" style="padding:40px 0"><span class="spinner"></span><h2 class="processing-title">Building the C2C Data Pack and checking the figures…</h2></div>`;
+    setTimeout(() => openCase(c), 1100);
   }
 
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
     currentCase = c;
-    if (c.status === "COLLECTING") { renderCollecting(c); return; }
     showView("case"); renderCase();
   }
 
@@ -892,12 +856,10 @@
     const sources = c.parties.map((p) => {
       const steps = p.banking_steps;
       const bank = steps ? `<div class="small" style="margin-top:8px">Open Banking: ${steps.accounts_connected} connection(s) → ${steps.accounts_after_merge} account(s), ${steps.duplicates_removed} duplicate transactions removed, ${steps.transfers_paired || 0} own transfers paired.</div>` : "";
-      const hmrc = p.role === "COMPANY" ? "" :
-        `<div class="small" style="margin-top:6px">HMRC shared: <strong>${esc(HMRC_CHOICE[p.hmrc_scope] || p.hmrc_scope)}</strong></div>`;
       return `<div class="detail-block">
         <div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">· ${esc(p.role.toLowerCase())}</span></div>
         <div class="source-chips">${p.sources.map((s) => pill("delivered", SOURCE[s] || s)).join("")}
-          ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div>${hmrc}${bank}</div>`;
+          ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div>${bank}</div>`;
     }).join("");
 
     const waiting = {};
@@ -1081,10 +1043,10 @@
     showView("customer");
     $("customer-view").innerHTML = `
       <div class="demo-control"><div class="demo-control-label">Demo control &mdash; not part of the product</div>
-        <p class="small" style="margin:0">In the live service ${esc(first)} get${people.length > 1 ? "" : "s"} a secure link by email or text. This is the screen they see.</p></div>
+        <p class="small" style="margin:0">In the live service the hub sends ${esc(first)} a link by email or text, opened without signing in and good for 14 days. This is the screen they see; each answer goes on the case as a decision made by the customer.</p></div>
       <div class="eyebrow">ABC Ltd · your mortgage application</div>
       <h1 class="title">Please check these figures, ${esc(first)}</h1>
-      <p class="subtitle">We compared what you told us with your bank, credit file and HMRC records. Where they differ, please tell us which is right. Nothing changes without your answer.</p>
+      <p class="subtitle">We compared what you told us with your bank and your credit report. Where they differ, please tell us which is right. Nothing changes without your answer.</p>
       ${items.map((f) => `<div class="item">
         <h3>${esc(customerHeading(c, f))}</h3>
         <div class="finding-text">${esc(f.message)}</div>
