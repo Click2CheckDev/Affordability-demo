@@ -814,12 +814,7 @@
   }
 
   function glanceHtml(c) {
-    const g = E.glance(c), ch = E.changes(c);
-    const changed = ch.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>What changed</th><th class="num">Customer entered</th><th class="num">Now</th><th>From</th><th>By</th></tr></thead>
-        <tbody>${ch.map((x) => `<tr><td>${esc(x.label || fieldLabel(x.path, c))}</td><td class="num">${x.was === null ? "–" : gbp(x.was)}</td>
-          <td class="num"><strong>${gbp(x.now)}</strong></td><td>${esc(SOURCE[x.origin] || x.origin)}</td><td class="small muted">${esc(x.by)}</td></tr>`).join("")}</tbody></table></div>`
-      : '<p class="section-note">Nothing has changed from what the customer entered yet. Differences to decide are below.</p>';
+    const g = E.glance(c);
     return `<div class="section"><h2>At a glance</h2>
       <div class="stat-row four">
         <div class="stat-box brand"><div class="stat-value money">${gbp(g.disposable)}</div><div class="stat-label">Disposable a month</div>
@@ -830,7 +825,7 @@
           <div class="stat-sub">confirmed, replaced or added from a report</div></div>
         <div class="stat-box"><div class="stat-value">${g.differences}</div><div class="stat-label">Differences open</div>
           <div class="stat-sub">${g.alerts ? `${g.alerts} alert${g.alerts > 1 ? "s" : ""} to read` : "no alerts"}</div></div>
-      </div>${changed}</div>`;
+      </div></div>`;
   }
 
   function bankingHtml(c) {
@@ -846,7 +841,7 @@
       const income = ["SALARY", "BENEFITS", "PENSION_INCOME", "OTHER_INCOME"].filter((k) => bank.byCat[k]);
       const months = (c.months[party] || []).length;
       const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-      return `<div class="detail-block">
+      return `<div class="detail-block" data-src="all person:${esc(party)}">
         <div class="detail-block-header">${esc(p.name || party)} · ${plural(months, "complete month")}, ${esc(acc.period[0])} to ${esc(acc.period[1])}</div>
         <div class="detail-cols">
           <div><div class="detail-label">Connected</div><ul>${acc.connections.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} — ${plural(x.transactions, "transaction")}</li>`).join("")}</ul></div>
@@ -883,6 +878,9 @@
     const company = new Set(c.parties.filter((p) => p.role === "COMPANY").map((p) => p.key));
     const m = /^applicants\[(\d+)\]/.exec(path);
     const person = m && data.applicants[+m[1]] ? data.applicants[+m[1]].key : null;
+    if (person) t.push("person:" + person);
+    const owned = /^commitments\[(\d+)\]/.exec(path);
+    if (owned && data.commitments[+owned[1]] && data.commitments[+owned[1]].owner) t.push("person:" + data.commitments[+owned[1]].owner);
     const bank = origin === "OPEN_BANKING" || (status === "VERIFIED" && !path.startsWith("commitments["));
     const credit = ["CREDIT_FILE", "COMPANY_REPORT"].includes(origin) || (status === "VERIFIED" && path.startsWith("commitments["));
     if (bank) {
@@ -950,18 +948,25 @@
 
   // The source picker: everything merged, one bank account, or one credit report.
   function pickerHtml(c) {
-    const opts = [["all", "Household · all sources"]];
+    // The household (everyone), then each person (their accounts and credit
+    // report), each of their accounts and their credit report.
+    const opts = [["all", "Household · all sources", "all"]];
+    const several = c.parties.length > 1;
     c.parties.forEach((p) => {
-      ((c.accounts[p.key] || {}).accounts || []).forEach((a) => opts.push(["acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]));
+      const own = ((c.accounts[p.key] || {}).accounts || []).map((a) => ["acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]);
       const packed = c.pack.parties.find((x) => x.key === p.key);
-      if (packed && packed.credit) opts.push(["credit:" + p.key, `${p.name} · credit report`]);
+      if (packed && packed.credit) own.push(["credit:" + p.key, `${p.name} · credit report`]);
+      if (several) opts.push(["person:" + p.key, p.name, ["person:" + p.key].concat(own.map(([v]) => v)).join(" ")]);
+      own.forEach(([v, n]) => opts.push([v, n, v]));
     });
-    return opts.length > 1 ? `<div class="source-picker"><span class="small muted">Show</span>${opts.map(([v, n]) =>
-      `<button class="${v === pick ? "btn-primary" : "btn-secondary"}" data-pick="${esc(v)}">${esc(n)}</button>`).join("")}</div>` : "";
+    return opts.length > 1 ? `<div class="source-picker"><span class="small muted">Show</span>${opts.map(([v, n, m]) =>
+      `<button class="${v === pick ? "btn-primary" : "btn-secondary"}" data-pick="${esc(v)}" data-match="${esc(m)}"${v.startsWith("person:") ? ' style="font-weight:600"' : ""}>${esc(n)}</button>`).join("")}</div>` : "";
   }
   function applyPick() {
+    const chosen = document.querySelector(`#case-view [data-pick="${CSS.escape(pick)}"]`);
+    const match = chosen ? chosen.dataset.match.split(" ") : ["all"];
     document.querySelectorAll("#case-view [data-src]").forEach((el) =>
-      el.classList.toggle("src-off", el.dataset.src.split(" ").indexOf(pick) < 0));
+      el.classList.toggle("src-off", !el.dataset.src.split(" ").some((t) => match.includes(t))));
     Array.from(document.querySelectorAll("#case-view .src-group")).reverse().forEach((g) =>
       g.classList.toggle("src-off", !g.querySelector("[data-src]:not(.src-off)")));
   }
@@ -984,12 +989,19 @@
   // which is doing what (cases/screens.household). A company's accounts are a
   // block of their own, read by money in and out.
   function household(c) {
-    return [false, true].map((company) => {
-      const cols = [];
-      c.parties.filter((p) => (p.role === "COMPANY") === company && (c.months[p.key] || []).length).forEach((p) =>
-        ((c.accounts[p.key] || {}).accounts || []).forEach((a) =>
-          cols.push({ who: p.name, account: `${a.provider} ${a.account}`, b: E.breakdown(c, p.key, a.id) })));
-      if (!cols.length) return null;
+    const columns = (people) => people.filter((p) => (c.months[p.key] || []).length).flatMap((p) =>
+      ((c.accounts[p.key] || {}).accounts || []).map((a) => ({ who: p.name, account: `${a.provider} ${a.account}`, b: E.breakdown(c, p.key, a.id) })));
+    const people = c.parties.filter((p) => p.role !== "COMPANY");
+    const blocks = [];
+    if (columns(people).length) {
+      blocks.push([columns(people), false, "The household", "all"]);
+      if (people.filter((p) => columns([p]).length).length > 1) {
+        people.filter((p) => columns([p]).length).forEach((p) => blocks.push([columns([p]), false, p.name, "person:" + p.key]));
+      }
+    }
+    c.parties.filter((p) => p.role === "COMPANY" && columns([p]).length)
+      .forEach((p) => blocks.push([columns([p]), true, p.name, "all person:" + p.key]));
+    return blocks.map(([cols, company, title, src]) => {
       const r2 = (v) => Math.round(v * 100) / 100;
       const table = (kind) => {
         const each = cols.map((col) => Object.fromEntries(col.b[kind].map((r) => [r.category, r.average])));
@@ -1002,13 +1014,14 @@
       };
       if (company) {
         const line = (key) => { const v = cols.map((col) => col.b[key].average); return { values: v, total: r2(v.reduce((s, x) => s + x, 0)) }; };
-        return { company: true, cols: cols, moneyIn: line("moneyIn"), moneyOut: line("moneyOut") };
+        return { company: true, cols: cols, title: title, src: src, totalLabel: "Business", moneyIn: line("moneyIn"), moneyOut: line("moneyOut") };
       }
       const [income, incomeTotal] = table("income"), [spending, spendingTotal] = table("expenditure");
       const left = incomeTotal.values.map((v, i) => r2(v - spendingTotal.values[i]));
-      return { company: false, cols: cols, income: income, incomeTotal: incomeTotal, expenditure: spending,
+      return { company: false, cols: cols, title: title, src: src, totalLabel: src === "all" ? "Household" : "Total",
+               income: income, incomeTotal: incomeTotal, expenditure: spending,
                expenditureTotal: spendingTotal, left: { values: left, total: r2(left.reduce((s, v) => s + v, 0)) } };
-    }).filter(Boolean);
+    });
   }
   function householdHtml(c) {
     return household(c).map((h) => {
@@ -1019,8 +1032,8 @@
         : band("Income") + h.income.map((r) => row(r.label, r)).join("") + row("Total income", h.incomeTotal, true)
           + band("Expenditure") + h.expenditure.map((r) => row(r.label, r)).join("") + row("Total expenditure", h.expenditureTotal, true)
           + row("Left over (income less expenditure)", h.left, true);
-      return `<div class="detail-block" data-src="all"><div class="detail-block-header">${h.company ? "The business" : "The household"} <span class="muted" style="font-weight:400">· a month, every account added together</span></div>
-        <div class="table-wrap"><table><thead><tr><th></th>${h.cols.map((col) => `<th class="num">${esc(col.who)}<br><span class="muted" style="font-weight:400">${esc(col.account)}</span></th>`).join("")}<th class="num">${h.company ? "Business" : "Household"}</th></tr></thead>
+      return `<div class="detail-block" data-src="${esc(h.src)}"><div class="detail-block-header">${esc(h.title)} <span class="muted" style="font-weight:400">· a month, every account added together</span></div>
+        <div class="table-wrap"><table><thead><tr><th></th>${h.cols.map((col) => `<th class="num">${esc(col.who)}<br><span class="muted" style="font-weight:400">${esc(col.account)}</span></th>`).join("")}<th class="num">${esc(h.totalLabel)}</th></tr></thead>
         <tbody>${body}</tbody></table></div></div>`;
     }).join("");
   }
@@ -1315,8 +1328,8 @@
           margin: { left: 40, right: 40, top: 50 }, didDrawPage: () => watermark() });
       };
       // The household added together first, a column for each account.
-      household(c).forEach((h) => {
-        const head = [""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.company ? "Business" : "Household"]);
+      household(c).filter((h) => h.src.split(" ")[0] === "all").forEach((h) => {
+        const head = [""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.totalLabel]);
         const line = (label, r) => [label].concat(r.values.map((v) => v === null ? "–" : gbp(v)), [gbp(r.total)]);
         const blank = (t) => [t].concat(h.cols.map(() => ""), [""]);
         table(h.company ? "The business, a month" : "The household, a month: every account added together", head,
@@ -1344,9 +1357,6 @@
         ["Disposable income a month", gbp(g.disposable)], ["Outgoings a month", gbp(g.outgoings)],
         ["Net monthly income", gbp(s.net_monthly_income)], ["Household gross income a year", gbp(s.gross_annual_income)],
         ["Figures backed by a report", `${g.backed} of ${g.total}`], ["Differences still open", String(g.differences)]]);
-      const ch = E.changes(c);
-      if (ch.length) table("What changed", ["What", "Customer entered", "Now", "From", "By"], ch.map((x) => [
-        x.label || fieldLabel(x.path, c), x.was === null ? "–" : gbp(x.was), gbp(x.now), SOURCE[x.origin] || x.origin, x.by]));
       const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
       if (decided.length) table("Decisions", ["Decision", "By", "Finding"], decided.map((f) => [
         f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered" + (f.decision.reason ? ` — “${f.decision.reason}”` : ""),
