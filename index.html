@@ -651,6 +651,11 @@
     return r.arrayBuffer();
   }
   const shortTime = (d) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const monthLabel = (m) => new Date(m + "-01T12:00:00").toLocaleDateString("en-GB", { month: "short", year: "numeric" });
+  const CODES = { BGC: "Bank giro credit", BP: "Bill payment", CHG: "Charge", CHQ: "Cheque", CPT: "Cash machine",
+                  DD: "Direct debit", DEB: "Debit card", DEP: "Deposit", FPI: "Faster payment in",
+                  FPO: "Faster payment out", SO: "Standing order", TFR: "Transfer" };
+  let txCode = "", txAccount = "";
   const dateLong = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // ---- navigation -----------------------------------------------------------------------
@@ -761,6 +766,7 @@
 
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
+    if (currentCase !== c) { txCode = ""; txAccount = ""; }
     currentCase = c;
     showView("case"); renderCase();
   }
@@ -840,7 +846,7 @@
         <div class="detail-block-header">${esc(p.name || party)} · ${plural(months, "complete month")}, ${esc(acc.period[0])} to ${esc(acc.period[1])}</div>
         <div class="detail-cols">
           <div><div class="detail-label">Connected</div><ul>${acc.connections.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} — ${plural(x.transactions, "transaction")}</li>`).join("")}</ul></div>
-          <div><div class="detail-label">After merging</div><ul>${acc.accounts.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} (${esc(x.kind)}) — ${plural(x.transactions, "transaction")}</li>`).join("")}</ul></div>
+          <div><div class="detail-label">After merging</div><ul>${acc.accounts.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} (${esc(x.kind)}) — ${plural(x.transactions, "transaction")}${x.money_in ? `<br><span class="small muted">${gbp(x.money_in)} in / ${gbp(x.money_out)} out a month</span>` : ""}</li>`).join("")}</ul></div>
         </div>
         <p class="small" style="margin:8px 0 0">${plural(steps.accounts_connected || 0, "connection")} → ${plural(steps.accounts_after_merge || 0, "account")} · ${steps.duplicates_removed || 0} duplicates removed · ${steps.transfers_paired || 0} own transfers paired${waiting ? ` · ${waiting} to categorise` : ""}</p>
         <div class="table-wrap" style="margin-top:12px"><table>
@@ -901,6 +907,39 @@
     return fillTemplate(t, st, c, button);
   }
 
+  // Full income and expenditure, at the front of the case: each person's
+  // (and the company's) month by month, every account merged.
+  function breakdownHtml(c) {
+    const blocks = c.parties.filter((p) => (c.months[p.key] || []).length).map((p) => {
+      const b = E.breakdown(c, p.key);
+      const head = (title) => `<thead><tr><th>${title}</th>${b.months.map((m) => `<th class="num">${esc(monthLabel(m))}</th>`).join("")}<th class="num">Average</th></tr></thead>`;
+      const row = (label, r, strong) => `<tr><td>${strong ? `<strong>${esc(label)}</strong>` : esc(label)}</td>${r.months.map((v) => `<td class="num">${strong ? `<strong>${gbp(v)}</strong>` : gbp(v)}</td>`).join("")}<td class="num"><strong>${gbp(r.average)}</strong></td></tr>`;
+      const body = p.role === "COMPANY"
+        ? `<table>${head("Business account")}<tbody>${row("Money in", b.moneyIn)}${row("Money out", b.moneyOut)}</tbody></table>`
+        : `<table>${head("Full income")}<tbody>${b.income.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No income identified.</td></tr>'}${row("Total income", b.incomeTotal, true)}</tbody></table>
+           <table style="margin-top:12px">${head("Full expenditure")}<tbody>${b.expenditure.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No spending identified.</td></tr>'}${row("Total expenditure", b.expenditureTotal, true)}</tbody></table>`;
+      return `<div class="detail-block"><div class="detail-block-header">${esc(p.name)}</div><div class="table-wrap">${body}</div></div>`;
+    }).join("");
+    return blocks ? `<div class="section"><h2>Income and expenditure</h2>
+      <p class="section-note">From Open Banking, month by month over complete months, every account merged. Each account, and the credit report, are shown on their own further down.</p>${blocks}</div>` : "";
+  }
+
+  // Each credit report on its own, as it arrived.
+  function creditHtml(c) {
+    const reports = c.pack.parties.filter((p) => p.credit).map((p) => {
+      const cr = p.credit, accounts = cr.accounts || [];
+      const bits = [cr.score ? `score ${cr.score}` : "", cr.on_electoral_roll === true ? "on the electoral roll" : cr.on_electoral_roll === false ? "not on the electoral roll" : ""].filter(Boolean).join(" · ");
+      const courts = (cr.adverse || []).filter((a) => !a.lender).map((a) => `<p class="small" style="margin:6px 0 0">${esc(a.type)}${a.amount ? " " + gbp(a.amount) : ""}${a.date ? ", " + esc(a.date) : ""} · ${a.satisfied ? "satisfied" : "unsatisfied"}</p>`).join("");
+      return `<div class="detail-block"><div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">${esc(bits)}</span></div>
+        <div class="table-wrap"><table><thead><tr><th>Lender</th><th>Type</th><th>Status</th><th class="num">Balance</th><th class="num">Monthly</th><th class="num">Limit</th></tr></thead>
+        <tbody>${accounts.map((a) => `<tr><td>${esc(a.lender)}</td><td>${esc(label(a.type))}</td>
+          <td>${pill(["ACTIVE", "SETTLED"].includes(a.status) ? "derived" : "alert", a.status)}</td><td class="num">${gbp(a.balance)}</td>
+          <td class="num">${gbp(a.monthly_payment)}</td><td class="num">${a.credit_limit ? gbp(a.credit_limit) : "–"}</td></tr>`).join("")
+          || '<tr><td colspan="6" class="small">No accounts on the report.</td></tr>'}</tbody></table></div>${courts}</div>`;
+    }).join("");
+    return reports ? `<div class="section"><h2>Credit report</h2>${reports}</div>` : "";
+  }
+
   function renderCase() {
     const c = currentCase, ff = c.factfind;
     const open = openFindings(c);
@@ -922,6 +961,10 @@
       const k = t.party + "|" + (t.merchant || t.description); (waiting[k] = waiting[k] || []).push(t);
     });
     const names = {}; c.parties.forEach((p) => { names[p.key] = p.name; });
+    const accountName = {};
+    Object.values(c.accounts).forEach((acc) => acc.accounts.forEach((a) => { accountName[a.id] = `${a.provider} ${a.account}`; }));
+    const codes = [...new Set(c.transactions.map((t) => t.code).filter(Boolean))].sort();
+    const accountIds = [...new Set(c.transactions.map((t) => t.account).filter((a) => accountName[a]))];
     const toCategorise = Object.values(waiting).map((ts) => {
       const t = ts[0], dates = ts.map((x) => x.date).sort();
       const out = ts.reduce((s, x) => s + Math.max(0, -E.num(x.amount)), 0);
@@ -937,7 +980,8 @@
           <button class="btn-primary" data-categorise="${esc(t.id)}">Categorise</button></div></div>`;
     }).join("");
     const txRows = c.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((t) => `
-      <tr><td class="mono">${esc(t.date)}</td>
+      <tr data-code="${esc(t.code || "")}" data-account="${esc(t.account || "")}"${(txCode && t.code !== txCode) || (txAccount && t.account !== txAccount) ? ' style="display:none"' : ""}><td class="mono">${esc(t.date)}</td>
+        <td class="mono" title="${esc(CODES[t.code] || "")}">${esc(t.code || "–")}</td><td class="small muted">${esc(accountName[t.account] || "")}</td>
         <td>${esc(t.description)}${t.provider ? `<br><span class="mono muted">${esc(t.provider)}</span>` : ""}</td>
         <td class="num">${gbp(t.amount)}</td>${business.has(t.party)
           ? `<td>Business account</td><td>${pill("derived", "MONEY IN / OUT")}</td><td></td></tr>` : `<td>${esc(CAT[t.category] || t.category)}</td>
@@ -969,6 +1013,8 @@
         <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
       </div>
 
+      ${breakdownHtml(c)}
+
       ${glanceHtml(c)}
 
       <div class="section"><h2>Sources</h2>${sources}</div>
@@ -976,6 +1022,8 @@
       ${c.transactions.length ? `<div class="section"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
         <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
         ${bankingHtml(c)}</div>` : ""}
+
+      ${creditHtml(c)}
 
       ${taken.length ? `<div class="section"><h2>Taken from the sources<span class="count">${taken.length}</span></h2>
         <p class="section-note">The fact find is made with the reports' figures, not what the customer entered. Each one is on the audit trail. In the service, the broker can keep the customer's figure instead, with a reason.</p>
@@ -1003,8 +1051,12 @@
         <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which.</p>
         ${toCategorise}
         <details class="payments-detail"><summary>All categorised transactions (${c.transactions.length}) – how each was placed</summary>
-          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th><th></th></tr></thead>
-          <tbody>${txRows}</tbody></table></div></details></div>` : ""}
+          <div class="inline-form" style="margin:10px 0">
+            <label class="check">Code <select id="tx-code"><option value="">All</option>${codes.map((k) => `<option value="${esc(k)}" ${k === txCode ? "selected" : ""}>${esc(k)} – ${esc(CODES[k] || k)}</option>`).join("")}</select></label>
+            <label class="check">Account <select id="tx-account"><option value="">All</option>${accountIds.map((a) => `<option value="${esc(a)}" ${a === txAccount ? "selected" : ""}>${esc(accountName[a])}</option>`).join("")}</select></label>
+            <span class="small muted" id="tx-count"></span></div>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Code</th><th>Account</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th><th></th></tr></thead>
+          <tbody id="tx-rows">${txRows}</tbody></table></div></details></div>` : ""}
 
       <div class="section"><h2>Fact find and budget planner<span class="count">C2C Mortgage Expenditure Form</span></h2>${factfindSections(c)}</div>
 
@@ -1025,6 +1077,17 @@
     banner = "";
 
     $("case-back").addEventListener("click", () => showView("portal"));
+    const filterRows = () => {
+      const rows = document.querySelectorAll("#tx-rows tr"); let shown = 0;
+      rows.forEach((r) => { const on = (!txCode || r.dataset.code === txCode) && (!txAccount || r.dataset.account === txAccount);
+                            r.style.display = on ? "" : "none"; if (on) shown++; });
+      if ($("tx-count")) $("tx-count").textContent = txCode || txAccount ? `${shown} of ${rows.length}` : "";
+    };
+    if ($("tx-code")) {
+      $("tx-code").addEventListener("change", (e) => { txCode = e.target.value; filterRows(); });
+      $("tx-account").addEventListener("change", (e) => { txAccount = e.target.value; filterRows(); });
+      filterRows();
+    }
     document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
       E.accept(c, b.dataset.accept, WHO, D.lines); save(); renderCase();
     }));
@@ -1102,6 +1165,7 @@
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
       const g = E.glance(c), s = c.factfind.data.summary;
+      const names = (key) => (c.parties.find((p) => p.key === key) || {}).name || key;
       const pink = [230, 23, 88], ink = [28, 27, 31];
       const marked = new Set();
       const watermark = () => {
@@ -1128,6 +1192,20 @@
           theme: "grid", styles: { fontSize: 8.5, cellPadding: 4 }, headStyles: { fillColor: pink },
           margin: { left: 40, right: 40, top: 50 }, didDrawPage: () => watermark() });
       };
+      // Full income and expenditure first.
+      c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => {
+        const b = E.breakdown(c, p.key), head = b.months.map(monthLabel).concat(["Average"]);
+        const line = (label, r) => [label].concat(r.months.map(gbp), [gbp(r.average)]);
+        if (p.role === "COMPANY") {
+          table(`Income and expenditure · ${p.name}`, ["Business account"].concat(head),
+                [line("Money in", b.moneyIn), line("Money out", b.moneyOut)]);
+          return;
+        }
+        table(`Income and expenditure · ${p.name}`, ["Full income"].concat(head),
+              b.income.map((r) => line(CAT[r.category] || r.category, r)).concat([line("Total income", b.incomeTotal)]));
+        table(" ", ["Full expenditure"].concat(head),
+              b.expenditure.map((r) => line(CAT[r.category] || r.category, r)).concat([line("Total expenditure", b.expenditureTotal)]));
+      });
       table("At a glance", ["Measure", "Value"], [
         ["Disposable income a month", gbp(g.disposable)], ["Outgoings a month", gbp(g.outgoings)],
         ["Net monthly income", gbp(s.net_monthly_income)], ["Household gross income a year", gbp(s.gross_annual_income)],
@@ -1146,6 +1224,16 @@
       const commitments = c.factfind.data.commitments.filter(Boolean);
       if (commitments.length) table("Commitments", ["Whose", "Lender", "Balance", "Monthly"],
         commitments.map((r) => [r.owner_name || r.owner, r.lender, gbp(r.balance), gbp(r.monthly_payment)]));
+      c.pack.parties.filter((p) => p.credit).forEach((p) => {
+        const rows = (p.credit.accounts || []).map((a) => [a.lender, label(a.type), label(a.status), gbp(a.balance),
+                                                           gbp(a.monthly_payment), a.credit_limit ? gbp(a.credit_limit) : "–"]);
+        table(`Credit report · ${p.name}`, ["Lender", "Type", "Status", "Balance", "Monthly", "Limit"],
+              rows.length ? rows : [["No accounts on the report.", "", "", "", "", ""]]);
+      });
+      const bankRows = [];
+      Object.entries(c.accounts).forEach(([party, acc]) => acc.accounts.forEach((a) => bankRows.push(
+        [`${a.provider} ${a.account}`, names(party), a.kind, String(a.transactions), gbp(a.money_in), gbp(a.money_out)])));
+      if (bankRows.length) table("Bank accounts", ["Account", "Whose", "Kind", "Transactions", "In a month", "Out a month"], bankRows);
       table("Sources", ["Person", "Reports"], c.parties.map((p) => [p.name, p.sources.map((x) => SOURCE[x] || x).join(", ")]));
       if (c.factfind.audit.length) table("Audit trail", ["When", "Who", "What", "Was", "Now"],
         c.factfind.audit.map((e) => [String(e.at).slice(0, 16).replace("T", " "), e.by,

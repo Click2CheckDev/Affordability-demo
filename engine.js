@@ -143,6 +143,35 @@
     return { lines: lines, byCat: byCat };
   }
 
+  // Full income and expenditure month by month, with the average, as the
+  // service's openbanking.aggregate.breakdown. Recategorising changes it.
+  function breakdown(kase, party) {
+    const months = kase.months[party] || [];
+    const at = {}; months.forEach((m, i) => { at[m] = i; });
+    const zeros = () => months.map(() => 0);
+    const income = {}, spending = {}, moneyIn = zeros(), moneyOut = zeros();
+    kase.transactions.filter((t) => t.party === party).forEach((t) => {
+      const i = at[t.date.slice(0, 7)];
+      if (i === undefined) return;
+      const a = num(t.amount);
+      if (a > 0 && t.category !== "TRANSFER" && t.category !== "REFUND") moneyIn[i] += a;
+      if (a < 0 && t.category !== "TRANSFER") moneyOut[i] -= a;
+      if (isIncome(t.category) && a > 0) (income[t.category] = income[t.category] || zeros())[i] += a;
+      else if (isSpending(t.category) && a < 0) (spending[t.category] = spending[t.category] || zeros())[i] -= a;
+    });
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const avg = (vals) => months.length ? r2(vals.reduce((s, v) => s + v, 0) / months.length) : 0;
+    const table = (rows) => Object.entries(rows)
+      .map(([cat, vals]) => ({ category: cat, months: vals.map(r2), average: avg(vals) }))
+      .sort((a, b) => b.average - a.average);
+    const total = (rows) => { const sums = months.map((_, i) => rows.reduce((s, r) => s + r.months[i], 0));
+                              return { months: sums.map(r2), average: avg(sums) }; };
+    const inc = table(income), exp = table(spending);
+    return { months: months, income: inc, incomeTotal: total(inc), expenditure: exp, expenditureTotal: total(exp),
+             moneyIn: { months: moneyIn.map(r2), average: avg(moneyIn) },
+             moneyOut: { months: moneyOut.map(r2), average: avg(moneyOut) } };
+  }
+
   function within(a, b, tol) {
     return Math.abs(a - b) <= Math.max(tol.abs, tol.rel * Math.max(Math.abs(a), Math.abs(b)));
   }
@@ -424,7 +453,7 @@
   }
 
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
-                bankLines, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
+                bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
                 makeCase, rename, glance, changes, dataPack };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
