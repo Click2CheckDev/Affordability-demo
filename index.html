@@ -446,8 +446,6 @@
                          display: inline-flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
   .progress-list .wait { width: 20px; height: 20px; border-radius: 50%; border: 2px dashed var(--border-strong); flex-shrink: 0; }
   .template-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-  .customer-card .item { border: 1px solid var(--border); border-radius: 4px; padding: 16px 18px; margin-bottom: 14px; background: var(--surface); }
-  .customer-card .item h3 { margin: 0 0 6px; font-size: 15px; font-weight: 500; color: var(--ink); }
   .choice { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 13.5px; color: var(--ink); }
   .choice label { display: inline-flex; gap: 6px; align-items: center; }
   #mobile-nav { display: none; font: inherit; font-size: 13px; padding: 6px 8px; margin-right: 16px;
@@ -543,9 +541,6 @@
   <!-- CASE DETAIL -->
   <div id="case-view" class="card wide hidden"></div>
 
-  <!-- THE CUSTOMER'S SCREEN -->
-  <div id="customer-view" class="card wide customer-card hidden"></div>
-
   <!-- TEMPLATES -->
   <div id="templates-view" class="card wide hidden"></div>
 
@@ -558,11 +553,11 @@
       <li><strong>Start from the hub.</strong> Affordability starts once the hub has each person's credit report and Open Banking (several banks). That is all it needs, and the case opens with both.</li>
       <li><strong>Open Banking aggregate.</strong> Accounts connected twice are merged, overlapping feeds de-duplicated, transfers between the customer's own accounts paired, and every transaction placed on a budget planner line. <span class="tag code">RULES · ACCOUNTSCORE MAP · MERCHANT MEMORY · TRAINED MODEL</span></li>
       <li><strong>C2C Data Pack.</strong> Every party's credit report and banking in one file. Residential and commercial use the same model; a commercial case adds the company, and each director gets the same personal checks.</li>
-      <li><strong>Validate.</strong> What the customer entered is compared with both sources: income against pay into the bank, commitments against the credit report and the bank, spending against the bank. Differences are flagged, not changed.</li>
-      <li><strong>Broker and customer decide.</strong> The broker (or the hub) sends the customer a link; they open it without signing in and confirm or dispute each change. The broker records the rest. Every decision goes on the audit trail, with who made it. <span class="tag code">NO AI ON A CASE</span></li>
+      <li><strong>Validate.</strong> What the customer entered is compared with both sources: income against pay into the bank, commitments against the credit report and the bank, spending against the bank. Differences are flagged.</li>
+      <li><strong>Source figures by default.</strong> The fact find is made with the reports' figures, not what the customer entered, and each one is on the audit trail. The customer isn't asked; the broker can keep the customer's figure instead, with a reason, and decides what has no figure to take. <span class="tag code">NO AI ON A CASE</span></li>
       <li><strong>Fact find and budget planner.</strong> Populated and validated, on the lines of the C2C Mortgage Expenditure Form, with where each figure came from.</li>
       <li><strong>Fill any template.</strong> The C2C form, or the firm's or lender's own PDF, Excel or form fields. AI proposes how a new template maps; a person approves it once, and from then on it fills every case. <span class="tag ai">AI PROPOSES · PERSON APPROVES</span></li>
-      <li><strong>Back to the hub.</strong> The hub is told when the case opens, when the customer answers, when the broker approves, and when a form or case report is ready. Each notice is signed and carries no personal data; the hub fetches the case with its own key.</li>
+      <li><strong>Back to the hub.</strong> The hub is told when the case opens, when the broker approves, and when a form or case report is ready. Each notice is signed and carries no personal data; the hub fetches the case with its own key.</li>
     </ol>
     <div class="panel">
       <p style="margin:0 0 6px"><strong>Later, in the C2C hub.</strong> Affordability will sit in the hub alongside the other checks, which run on the same case but are not part of affordability:</p>
@@ -630,7 +625,6 @@
   // ---- helpers -----------------------------------------------------------------------
   const openFindings = (c) => c.findings.filter((f) => !f.decision && f.outcome !== "MATCH");
   const blocking = (c) => openFindings(c).filter((f) => f.outcome === "DIFFERENCE").length;
-  const forCustomer = (c) => c.findings.filter((f) => !f.decision && f.outcome === "DIFFERENCE" && f.acceptable);
   const pill = (cls, text) => `<span class="status-pill ${esc(cls)}">${esc(text)}</span>`;
   function caseTitle(c) {
     if (c.company) return c.company;
@@ -656,19 +650,20 @@
     if (!r.ok) throw new Error("Could not load " + name);
     return r.arrayBuffer();
   }
+  const shortTime = (d) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const dateLong = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // ---- navigation -----------------------------------------------------------------------
-  let currentCase = null, banner = "", freshLink = null;
-  const VIEWS = ["portal", "new", "case", "customer", "templates", "how"];
+  let currentCase = null, banner = "";
+  const VIEWS = ["portal", "new", "case", "templates", "how"];
   const TITLES = { portal: "Cases", new: "New case", case: "Cases",
-                   customer: "Customer view", templates: "Templates", how: "How it works" };
+                   templates: "Templates", how: "How it works" };
   function showView(view) {
     VIEWS.forEach((v) => $(v + "-view").classList.toggle("hidden", v !== view));
     document.querySelectorAll(".sidebar-link").forEach((b) =>
-      b.classList.toggle("active", b.dataset.view === view || (["case", "customer"].includes(view) && b.dataset.view === "portal")));
+      b.classList.toggle("active", b.dataset.view === view || (view === "case" && b.dataset.view === "portal")));
     $("page-title").textContent = TITLES[view];
-    $("mobile-nav").value = ["case", "customer"].includes(view) ? "portal" : view;
+    $("mobile-nav").value = view === "case" ? "portal" : view;
     if (view === "portal") renderPortal();
     if (view === "new") renderNewCase();
     if (view === "templates") renderTemplates();
@@ -767,7 +762,6 @@
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
     currentCase = c;
-    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     showView("case"); renderCase();
   }
 
@@ -788,7 +782,7 @@
     let actions = "";
     if (f.outcome === "DIFFERENCE") {
       actions = `<div class="inline-form">
-        ${f.acceptable ? `<button class="btn-primary" data-accept="${esc(f.id)}">${f.action === "ADD_COMMITMENT" ? "Add to fact find" : "Customer accepts source figure"}</button>` : ""}
+        ${f.acceptable ? `<button class="btn-primary" data-accept="${esc(f.id)}">${f.action === "ADD_COMMITMENT" ? "Add to fact find" : "Use source figure"}</button>` : ""}
         <input type="text" placeholder="Why the entered figure stands" data-reason-for="${esc(f.id)}" />
         <button class="btn-secondary" data-dismiss="${esc(f.id)}">Keep entered</button>
       </div>`;
@@ -894,32 +888,6 @@
           <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
   }
 
-  // ---- the customer's link ------------------------------------------------------------------
-  const linkUrl = (l) => location.href.split("#")[0] + "#answer/" + l.token;
-  const shortTime = (d) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-  function linkHtml(c) {
-    const l = c.link;
-    if (!l) return "";
-    if (freshLink === c.id) {
-      return `<div class="panel" style="border-color:var(--brand)">
-        <p style="margin:0"><strong>Link for the customer</strong></p>
-        <p class="small" style="margin:4px 0 0">Send this to the customer. They open it without signing in and confirm or dispute the ${l.questions} change${l.questions === 1 ? "" : "s"} to decide. It works for 14 days and is shown only now; making another link retires this one.</p>
-        <div class="inline-form"><input type="text" id="cust-link" value="${esc(linkUrl(l))}" readonly />
-          <button class="btn-secondary" id="copy-link">Copy</button>
-          <button class="btn-primary" id="open-link">Open</button></div></div>`;
-    }
-    return `<p class="small muted" style="margin:0 0 8px">Customer link made by ${esc(l.by)} on ${esc(shortTime(l.at))} · ${l.answered_at
-      ? `answered ${esc(shortTime(l.answered_at))}`
-      : `waiting for the customer, until ${esc(new Date(l.expires).toLocaleDateString("en-GB", { day: "numeric", month: "short" }))}`}</p>`;
-  }
-  function newLink(c) {
-    const token = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
-    const at = new Date();
-    c.link = { token: token, by: WHO, at: at.toISOString(), questions: forCustomer(c).length,
-               expires: new Date(at.getTime() + 14 * 86400000).toISOString(), answered_at: null };
-    freshLink = c.id; save(); renderCase();
-  }
-
   // ---- outputs --------------------------------------------------------------------------------
   function recordOutput(c, kind, filename) {
     (c.outputs = c.outputs || []).unshift({ kind: kind, filename: filename, by: WHO, at: new Date().toISOString() });
@@ -939,7 +907,6 @@
     const order = { DIFFERENCE: 0, ALERT: 1, UNVERIFIABLE: 2 };
     open.sort((a, b) => order[a.outcome] - order[b.outcome]);
     const complete = c.status === "COMPLETE";
-    const questions = forCustomer(c).length;
     const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
     const sources = c.parties.map((p) => `<div class="detail-block">
@@ -979,13 +946,13 @@
           <label class="check"><input type="checkbox" data-row-remember="${esc(t.id)}" /> remember</label>
           <button class="btn-secondary" data-change="${esc(t.id)}">Change</button></div></td></tr>`}`).join("");
 
-    const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
+    const taken = c.findings.filter((f) => f.decision && f.decision.default);
+    const decided = c.findings.filter((f) => f.decision && !f.decision.default && f.decision.kind !== "RESOLVED");
     const matches = c.findings.filter((f) => f.outcome === "MATCH");
     const audit = ff.audit.slice().reverse().map((e) => `
       <tr><td class="mono">${esc(String(e.at).slice(0, 16).replace("T", " "))}</td><td>${esc(e.by)}</td>
         <td title="${esc(e.path)}">${esc(/^(applicants|expenditure|commitments|company)/.test(e.path) ? fieldLabel(e.path, c) : e.path)}</td><td class="num">${esc(e.old === null ? "–" : e.old)}</td>
         <td class="num">${esc(e.new)}</td><td>${esc(SOURCE[e.origin] || e.origin)}</td></tr>`).join("");
-    const firstName = (ff.data.applicants[0] || {}).first_name || "the customer";
     const outputs = (c.outputs || []).map((o, i) => `<tr><td><button class="link-button" data-output="${i}">${esc(o.filename)}</button></td>
       <td class="small muted">${esc(o.by)} · ${esc(shortTime(o.at))}</td></tr>`).join("");
 
@@ -1000,9 +967,7 @@
       <div class="case-actions">
         <button class="btn-secondary" id="dl-pack">Download Data Pack</button>
         <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
-        ${questions && !complete ? `<button class="btn-primary" id="send-customer">Send to the customer</button>` : ""}
       </div>
-      ${linkHtml(c)}
 
       ${glanceHtml(c)}
 
@@ -1012,8 +977,16 @@
         <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
         ${bankingHtml(c)}</div>` : ""}
 
+      ${taken.length ? `<div class="section"><h2>Taken from the sources<span class="count">${taken.length}</span></h2>
+        <p class="section-note">The fact find is made with the reports' figures, not what the customer entered. Each one is on the audit trail. In the service, the broker can keep the customer's figure instead, with a reason.</p>
+        ${taken.map((f) => `<div class="panel finding">
+          <div class="finding-head">${pill(f.action === "ADD_COMMITMENT" ? "added" : "replaced", f.action === "ADD_COMMITMENT" ? "ADDED" : "REPLACED")}
+            <span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
+          <div class="finding-text">${esc(f.message)}</div>
+          <div class="figures"><div><div class="fig-label">Entered</div><div class="fig-value money">${f.declared ? gbp(f.declared) : "–"}</div></div>
+            <div><div class="fig-label">Now</div><div class="fig-value money new">${gbp(f.proposed)}</div></div></div></div>`).join("")}</div>` : ""}
+
       <div class="section"><h2>To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
-        ${questions && !complete ? `<p class="section-note">${questions} of these need${questions === 1 ? "s" : ""} the customer's agreement: press <strong>Send to the customer</strong> above for ${esc(firstName)} to confirm or dispute on their own screen, or record their answer below.</p>` : ""}
         ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
         ${decided.length ? `<details class="payments-detail"><summary>Decided (${decided.length})</summary>
           ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered"} · ${esc(f.decision.by)}</div>
@@ -1052,14 +1025,6 @@
     banner = "";
 
     $("case-back").addEventListener("click", () => showView("portal"));
-    if ($("send-customer")) $("send-customer").addEventListener("click", () => newLink(c));
-    if ($("copy-link")) $("copy-link").addEventListener("click", (e) => {
-      const input = $("cust-link"); input.select();
-      if (navigator.clipboard) navigator.clipboard.writeText(input.value);
-      e.target.textContent = "Copied";
-    });
-    if ($("open-link")) $("open-link").addEventListener("click", () => { freshLink = null; location.hash = "answer/" + c.link.token; });
-    freshLink = null;
     document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
       E.accept(c, b.dataset.accept, WHO, D.lines); save(); renderCase();
     }));
@@ -1097,123 +1062,6 @@
       save(); renderCase();
     });
   }
-
-  // ---- the customer's screen -----------------------------------------------------------------
-  // What the customer is asked, in their words: the same wording as the
-  // service's customer page (cases/customer.py).
-  const CUSTOMER_SOURCE = { CREDIT_FILE: "your credit report", OPEN_BANKING: "your bank statements",
-                            COMPANY_REPORT: "the company report", HMRC_PAYROLL: "HMRC", HMRC_SA: "HMRC" };
-  const FIELD = {}; D.fields.forEach((f) => { FIELD[f.path] = f; });
-  const money = (v) => (v === null || v === undefined || v === "") ? "" : "£" + E.fmt(v);
-  const capitalise = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-  function question(c, f) {
-    const data = c.factfind.data, people = data.applicants;
-    let title, said, ask;
-    if (f.action === "ADD_COMMITMENT") {
-      const row = (f.extra || {}).row || {};
-      title = `${row.lender || "A lender"} ${String(row.type || "").replace(/_/g, " ").toLowerCase()}`.trim();
-      said = "Not on the form you gave us";
-      ask = `Should we add it, at ${money(f.proposed)} a month?`;
-    } else if (f.path.startsWith("commitments[")) {
-      const row = E.getPath(data, f.path.slice(0, f.path.lastIndexOf(".")), {}) || {};
-      title = `Your ${row.lender || ""} ${String(row.type || "").replace(/_/g, " ").toLowerCase()} payment`.replace("  ", " ");
-      said = `You told us ${money(f.declared)} a month`;
-      ask = `Should we use ${money(f.proposed)} a month instead?`;
-    } else {
-      const field = FIELD[f.path.replace(/\[\d+\]/g, "[n]")];
-      title = field ? field.label : capitalise(f.path.slice(f.path.lastIndexOf(".") + 1).replace(/_/g, " "));
-      const m = /^applicants\[(\d+)\]/.exec(f.path);
-      if (m && people[+m[1]]) title = `${people[+m[1]].first_name}'s ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
-      said = `You told us ${money(f.declared)}`;
-      ask = `Should we use ${money(f.proposed)} instead?`;
-    }
-    const source = CUSTOMER_SOURCE[f.source] || "the report";
-    const shows = `${capitalise(source)} ${source.endsWith("statements") ? "show" : "shows"} ${money(f.evidence)}`;
-    return { id: f.id, title: title, said: said, shows: shows, ask: ask };
-  }
-
-  function renderCustomer(c) {
-    showView("customer");
-    const view = $("customer-view"), l = c.link;
-    const names = c.factfind.data.applicants.map((a) => a.full_name).filter(Boolean);
-    const back = `<div class="demo-control"><div class="demo-control-label">Demo control &mdash; not part of the product</div>
-        <p class="small" style="margin:0 0 10px">This is the customer's own page, opened from the link without signing in. Each answer goes on the case as a decision made by the customer.</p>
-        <button class="btn-secondary" id="cust-back" style="width:auto">Back to the broker view</button></div>`;
-    if (l.answered_at) {
-      view.innerHTML = `${back}<div class="panel" style="text-align:center;padding:32px 18px">
-        <div style="font-size:34px;color:var(--teal)">✓</div><h1 class="title">Thank you</h1>
-        <p class="subtitle" style="margin:0 auto">Your answers have gone to your adviser at ${esc(D.firm)}. You can close this page.</p></div>`;
-      $("cust-back").addEventListener("click", () => openCase(c));
-      return;
-    }
-    const items = forCustomer(c).map((f) => question(c, f));
-    view.innerHTML = `${back}
-      <h1 class="title">Please check these figures</h1>
-      <p class="subtitle">Your adviser at ${esc(D.firm)} compared what you told them with your bank statements and credit report. Where they differ, tell us which is right. Nothing changes without your answer.</p>
-      <div id="cust-error" class="banner hidden" style="border-color:rgba(230,23,88,0.4);background:rgba(230,23,88,0.06);color:var(--brand-ink)"></div>
-      <div class="item"><label for="cust-name"><strong>Who is answering?</strong></label>
-        <div class="inline-form" style="margin-top:8px"><select id="cust-name">${names.map((n) => `<option>${esc(n)}</option>`).join("")}</select></div></div>
-      ${items.map((q) => `<div class="item">
-        <h3>${esc(q.title)}</h3>
-        <div class="figures"><div class="fig-value" style="font-size:14px">${esc(q.said)}</div><div class="fig-value" style="font-size:14px">${esc(q.shows)}</div></div>
-        <div class="finding-text">${esc(q.ask)}</div>
-        <div class="choice">
-          <label><input type="radio" name="ans-${esc(q.id)}" value="yes" /> Yes, use that</label>
-          <label><input type="radio" name="ans-${esc(q.id)}" value="no" /> No, mine is right</label>
-        </div>
-        <div class="inline-form" style="margin-top:8px"><input type="text" maxlength="300" placeholder="If not, why? (optional)" data-cust-reason="${esc(q.id)}" /></div>
-      </div>`).join("") || '<div class="panel">Nothing needs your answer. Thank you.</div>'}
-      ${items.length ? '<div class="actions"><button class="btn-primary" id="cust-send">Send my answers</button></div>' : ""}`;
-    $("cust-back").addEventListener("click", () => openCase(c));
-    if (!items.length) return;
-    $("cust-send").addEventListener("click", () => {
-      const answers = items.map((q) => {
-        const picked = document.querySelector(`input[name="ans-${CSS.escape(q.id)}"]:checked`);
-        return { id: q.id, picked: picked && picked.value,
-                 reason: document.querySelector(`[data-cust-reason="${CSS.escape(q.id)}"]`).value.trim() };
-      });
-      if (answers.some((a) => !a.picked)) {
-        $("cust-error").textContent = "Please answer every question."; $("cust-error").classList.remove("hidden");
-        window.scrollTo(0, 0); return;
-      }
-      const name = $("cust-name").value;
-      let yes = 0, no = 0;
-      answers.forEach((a) => {
-        // Accepting one change can settle another; that one is no longer asked.
-        if (!forCustomer(c).some((f) => f.id === a.id)) return;
-        E.customerAnswer(c, a.id, a.picked === "yes", name, a.reason || "The customer says their figure is right", D.lines);
-        a.picked === "yes" ? yes++ : no++;
-      });
-      l.answered_at = new Date().toISOString();
-      banner = `${name} answered: ${yes} accepted, ${no} kept as entered. Their answers are on the audit trail.`;
-      save(); renderCustomer(c);
-    });
-  }
-
-  // A customer link opened in this browser: #answer/<token>.
-  function route() {
-    const m = /^#answer\/([0-9a-f]+)$/.exec(location.hash);
-    if (!m) return false;
-    const c = state.cases.find((x) => x.link && x.link.token === m[1]);
-    if (!c || new Date(c.link.expires) < new Date()) {
-      showView("customer");
-      $("customer-view").innerHTML = `<h1 class="title">Not found</h1><p class="subtitle">This link has expired or been replaced. Ask your adviser for a new one.</p>
-        <div class="actions"><button class="btn-secondary" id="cust-home">Back to the broker view</button></div>`;
-      $("cust-home").addEventListener("click", () => { history.replaceState(null, "", location.pathname + location.search); showView("portal"); });
-      return true;
-    }
-    renderCustomer(c);
-    return true;
-  }
-  window.addEventListener("hashchange", route);
-  // Answers given in another tab of this browser.
-  window.addEventListener("storage", (e) => {
-    if (e.key !== KEY) return;
-    state = load();
-    if (currentCase) currentCase = state.cases.find((x) => x.id === currentCase.id) || null;
-    if (!$("case-view").classList.contains("hidden") && currentCase) renderCase();
-    else if (!$("portal-view").classList.contains("hidden")) renderPortal();
-  });
 
   // ---- Excel and PDF ----------------------------------------------------------------------------
   // ExcelJS drops links between tabs when it reads a workbook; the form's
@@ -1466,7 +1314,7 @@
     });
   }
 
-  if (!route()) showView("portal");
+  showView("portal");
 })();
 </script>
 </body>

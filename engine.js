@@ -401,13 +401,6 @@
     }).filter((x) => x.added || String(x.was) !== String(x.now));
   }
 
-  // --- the customer's side ---------------------------------------------------------------
-  function customerAnswer(c, findingId, agrees, customer, reason, lines) {
-    const who = `${customer} (customer)`;
-    return agrees ? accept(c, findingId, who, lines)
-                  : dismiss(c, findingId, who, reason || "Customer disagreed");
-  }
-
   // --- the C2C Data Pack, as it stands now ------------------------------------------------
   function dataPack(c, lines) {
     const pack = JSON.parse(JSON.stringify(c.pack));
@@ -432,7 +425,7 @@
 
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
                 bankLines, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
-                makeCase, rename, glance, changes, customerAnswer, dataPack };
+                makeCase, rename, glance, changes, dataPack };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);
