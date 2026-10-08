@@ -836,7 +836,7 @@
       const packed = ((c.pack.parties.find((x) => x.key === party) || {}).banking) || {};
       const only = { ...c, transactions: c.transactions.filter((t) => t.party === party), months: { [party]: c.months[party] || [] } };
       const bank = E.bankLines(only);
-      const waiting = only.transactions.filter((t) => t.category === "UNCATEGORISED").length;
+      const waiting = p.role === "COMPANY" ? 0 : only.transactions.filter((t) => t.category === "UNCATEGORISED").length;
       const lines = D.lines.filter((l) => bank.lines[l.key] && !l.commitment_types.length);
       const credit = D.lines.filter((l) => bank.lines[l.key] && l.commitment_types.length);
       const income = ["SALARY", "BENEFITS", "PENSION_INCOME", "OTHER_INCOME"].filter((k) => bank.byCat[k]);
@@ -947,8 +947,11 @@
         <div class="source-chips">${p.sources.map((s) => pill("delivered", SOURCE[s] || s)).join("")}
           ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div></div>`).join("");
 
+    // A company account is measured by money in and out, not budget lines,
+    // so its transactions are never put to a broker to categorise.
+    const business = new Set(c.parties.filter((p) => p.role === "COMPANY").map((p) => p.key));
     const waiting = {};
-    c.transactions.filter((t) => t.category === "UNCATEGORISED").forEach((t) => {
+    c.transactions.filter((t) => t.category === "UNCATEGORISED" && !business.has(t.party)).forEach((t) => {
       const k = t.party + "|" + (t.merchant || t.description); (waiting[k] = waiting[k] || []).push(t);
     });
     const names = {}; c.parties.forEach((p) => { names[p.key] = p.name; });
@@ -969,11 +972,12 @@
     const txRows = c.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((t) => `
       <tr><td class="mono">${esc(t.date)}</td>
         <td>${esc(t.description)}${t.provider ? `<br><span class="mono muted">${esc(t.provider)}</span>` : ""}</td>
-        <td class="num">${gbp(t.amount)}</td><td>${esc(CAT[t.category] || t.category)}</td>
+        <td class="num">${gbp(t.amount)}</td>${business.has(t.party)
+          ? `<td>Business account</td><td>${pill("derived", "MONEY IN / OUT")}</td><td></td></tr>` : `<td>${esc(CAT[t.category] || t.category)}</td>
         <td>${pill(t.basis === "NONE" ? "difference" : ["OVERRIDE", "MEMORY"].includes(t.basis) ? "verified" : "derived", BASIS[t.basis] || t.basis)}</td>
         <td><div class="inline-form" style="margin:0;flex-wrap:nowrap">${categorySelect(t.category, `data-row-cat="${esc(t.id)}"`)}
           <label class="check"><input type="checkbox" data-row-remember="${esc(t.id)}" /> remember</label>
-          <button class="btn-secondary" data-change="${esc(t.id)}">Change</button></div></td></tr>`).join("");
+          <button class="btn-secondary" data-change="${esc(t.id)}">Change</button></div></td></tr>`}`).join("");
 
     const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
     const matches = c.findings.filter((f) => f.outcome === "MATCH");
