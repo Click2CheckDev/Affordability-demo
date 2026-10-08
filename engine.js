@@ -5,7 +5,7 @@
  *
  *  - accepting a finding applies the changes the real engine worked out for it
  *  - recategorising a transaction re-averages the bank figures and re-runs the
- *    spending check -- the one rule this page repeats, with the same tolerance
+ *    spending check -- the one rule this page repeats: the bank's figure is taken
  *  - totals are recalculated the way the fact find does it
  *  - forms are filled in the browser from the same mapping files
  */
@@ -145,12 +145,12 @@
 
   // Full income and expenditure month by month, with the average, as the
   // service's openbanking.aggregate.breakdown. Recategorising changes it.
-  function breakdown(kase, party) {
+  function breakdown(kase, party, account) {
     const months = kase.months[party] || [];
     const at = {}; months.forEach((m, i) => { at[m] = i; });
     const zeros = () => months.map(() => 0);
     const income = {}, spending = {}, moneyIn = zeros(), moneyOut = zeros();
-    kase.transactions.filter((t) => t.party === party).forEach((t) => {
+    kase.transactions.filter((t) => t.party === party && (!account || t.account === account)).forEach((t) => {
       const i = at[t.date.slice(0, 7)];
       if (i === undefined) return;
       const a = num(t.amount);
@@ -172,12 +172,10 @@
              moneyOut: { months: moneyOut.map(r2), average: avg(moneyOut) } };
   }
 
-  function within(a, b, tol) {
-    return Math.abs(a - b) <= Math.max(tol.abs, tol.rel * Math.max(Math.abs(a), Math.abs(b)));
-  }
-
-  function recheckSpending(kase, lineDefs, tolerances) {
-    const tol = { abs: num(tolerances.spending_abs), rel: num(tolerances.spending_rel) };
+  // The bank has priority: wherever it measures a line, its figure is taken
+  // by default, higher or lower, as the service's validation does.
+  const DEFAULT_BY = "C2C (source figure by default)";
+  function recheckSpending(kase, lineDefs) {
     const bank = bankLines(kase);
     const ff = kase.factfind;
     lineDefs.filter((l) => !l.commitment_types.length).forEach((l) => {
@@ -190,18 +188,29 @@
         setPath(ff.data, path, banked);
         return;
       }
+      // Taken by default before: keep following the bank.
+      if (existing && existing.decision && existing.decision.default) {
+        if (num(banked)) {
+          setPath(ff.data, path, banked);
+          Object.assign(existing, { evidence: banked, proposed: banked,
+            message: `${l.label} entered as £${fmt(num(existing.declared))} a month; the bank shows £${fmt(num(banked))} on average.` });
+        }
+        return;
+      }
       if (!["DECLARED", "VERIFIED"].includes(p.status) || (existing && existing.decision)) return;
       const declared = num(getPath(ff.data, path));
       const b = num(banked);
       let finding = null;
-      if (b > declared && !within(declared, b, tol)) {
+      if (b && money2(declared) !== banked) {
+        const message = `${l.label} entered as £${fmt(declared)} a month; the bank shows £${fmt(b)} on average.`;
+        setPath(ff.data, path, banked);
+        ff.provenance[path] = { origin: "OPEN_BANKING", status: "REPLACED" };
+        ff.audit.push({ at: now(), by: DEFAULT_BY, path: path, old: money2(declared), new: banked,
+                        origin: "OPEN_BANKING", status: "REPLACED", reason: message });
         finding = {
-          id: id, party: null, path: path, outcome: "DIFFERENCE", source: "OPEN_BANKING",
-          message: `${l.label} entered as £${fmt(declared)} a month; the bank shows £${fmt(b)} on average.`,
-          declared: money2(declared), evidence: banked, proposed: banked, acceptable: true,
-          action: "REPLACE",
-          effects: { changes: [{ path: path, old: money2(declared), new: banked,
-                                 origin: "OPEN_BANKING", status: "REPLACED" }], resolves: [] },
+          id: id, party: null, path: path, outcome: "DIFFERENCE", source: "OPEN_BANKING", message: message,
+          declared: money2(declared), evidence: banked, proposed: banked, acceptable: true, action: "REPLACE",
+          decision: { kind: "ACCEPT", by: DEFAULT_BY, at: now(), default: true },
         };
       } else if (b) {
         finding = { id: id, party: null, path: path, outcome: "MATCH", source: "OPEN_BANKING",
@@ -252,7 +261,7 @@
     kase.factfind.audit.push({ at: now(), by: who, path: "transaction " + tx.description, old: null,
                                new: category, origin: "BROKER", status: remember ? "REMEMBERED" : "OVERRIDE",
                                reason: remember ? "Categorised, and remembered for this merchant" : "Categorised" });
-    cases.forEach((c) => recheckSpending(c, demo.lines, demo.tolerances));
+    cases.forEach((c) => recheckSpending(c, demo.lines));
     return true;
   }
 

@@ -409,6 +409,10 @@
   .btn-primary:disabled, .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
   .money { font-variant-numeric: tabular-nums; }
   .case-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 16px; }
+  .source-picker { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+                   background: var(--surface, #fff); padding: 10px 0; margin: 0 0 8px; border-bottom: 1px solid var(--border); }
+  .source-picker button { width: auto; padding: 6px 12px; font-size: 12.5px; }
+  .src-off { display: none !important; }
   .case-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
   .case-actions button { width: auto; padding: 9px 16px; font-size: 13px; }
   .link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--brand); cursor: pointer; text-align: left; text-decoration: underline; }
@@ -655,7 +659,7 @@
   const CODES = { BGC: "Bank giro credit", BP: "Bill payment", CHG: "Charge", CHQ: "Cheque", CPT: "Cash machine",
                   DD: "Direct debit", DEB: "Debit card", DEP: "Deposit", FPI: "Faster payment in",
                   FPO: "Faster payment out", SO: "Standing order", TFR: "Transfer" };
-  let txCode = "", txAccount = "";
+  let txCode = "", pick = "all";
   const dateLong = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // ---- navigation -----------------------------------------------------------------------
@@ -766,7 +770,7 @@
 
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
-    if (currentCase !== c) { txCode = ""; txAccount = ""; }
+    if (currentCase !== c) { txCode = ""; pick = "all"; }
     currentCase = c;
     showView("case"); renderCase();
   }
@@ -862,15 +866,61 @@
   }
 
   // The fact find section by section, as the case screen lists it.
-  function factfindSections(c) {
-    const data = c.factfind.data, prov = c.factfind.provenance;
+  // Which sources each figure belongs to, for the picker: the bank accounts
+  // that carry it, or the credit report it came from (cases/screens._tokens).
+  function sourceIndex(c) {
+    const accounts = [];
+    Object.entries(c.accounts).forEach(([party, acc]) => acc.accounts.forEach((a) => {
+      const b = E.breakdown(c, party, a.id);
+      accounts.push({ party: party, token: "acct:" + a.id, cats: new Set(b.income.concat(b.expenditure).map((r) => r.category)),
+                      moneyIn: b.moneyIn.average > 0 });
+    }));
+    return accounts;
+  }
+  function tokensFor(c, idx, path, origin, status) {
+    const data = c.factfind.data, t = ["all"];
+    const company = new Set(c.parties.filter((p) => p.role === "COMPANY").map((p) => p.key));
+    const m = /^applicants\[(\d+)\]/.exec(path);
+    const person = m && data.applicants[+m[1]] ? data.applicants[+m[1]].key : null;
+    const bank = origin === "OPEN_BANKING" || (status === "VERIFIED" && !path.startsWith("commitments["));
+    const credit = ["CREDIT_FILE", "COMPANY_REPORT"].includes(origin) || (status === "VERIFIED" && path.startsWith("commitments["));
+    if (bank) {
+      if (path.startsWith("expenditure.")) {
+        const line = path.split(".")[1].toUpperCase();
+        idx.filter((a) => !company.has(a.party) && a.cats.has(line)).forEach((a) => t.push(a.token));
+      } else if (person) idx.filter((a) => a.party === person && a.moneyIn).forEach((a) => t.push(a.token));
+      else if (path.startsWith("company.")) idx.filter((a) => company.has(a.party)).forEach((a) => t.push(a.token));
+    }
+    if (credit) {
+      const j = /^commitments\[(\d+)\]/.exec(path);
+      if (j) { const r = data.commitments[+j[1]]; if (r && r.owner) t.push("credit:" + r.owner); }
+      else if (person) t.push("credit:" + person);
+      else company.forEach((k) => t.push("credit:" + k));
+    }
+    return t.join(" ");
+  }
+
+  // The fact find, made from the consented reports: every figure with where
+  // it came from, and what the customer said where a source's was taken.
+  function takenHtml(c) {
+    const data = c.factfind.data, prov = c.factfind.provenance, idx = sourceIndex(c);
+    const said = {};
+    c.findings.filter((f) => f.decision && f.decision.default).forEach((f) => {
+      if (f.action === "ADD_COMMITMENT") {
+        const row = (f.extra || {}).row || {};
+        data.commitments.forEach((r, j) => {
+          if (r && r.lender === row.lender && r.owner === row.owner) said[`commitments[${j}].monthly_payment`] = "Not entered";
+        });
+      } else said[f.path] = gbp(f.declared);
+    });
     const sections = {}; D.sections.forEach((s) => { sections[s] = []; });
     const row = (label, path, kind) => {
       let value = E.getPath(data, path, "");
       if (value === null || value === undefined) value = "";
       if (kind === "money" && value !== "") value = gbp(value);
       const p = prov[path] || {};
-      return { label: label, path: path, value: String(value), origin: p.origin || "", status: p.status || "" };
+      return { label: label, path: path, value: String(value), origin: p.origin || "", status: p.status || "",
+               said: said[path] || "", src: tokensFor(c, idx, path, p.origin || "", p.status || "") };
     };
     data.applicants.forEach((a, i) => {
       const who = a.full_name || `Applicant ${i + 1}`;
@@ -886,12 +936,33 @@
       if (f.section === "Company" && !data.company) return;
       sections[f.section].push(row(f.label, f.path, f.kind));
     });
-    return D.sections.filter((s) => sections[s].length).map((s) => `
-      <div class="detail-block"><div class="detail-block-header">${esc(s)}</div>
-        <div class="table-wrap"><table><thead><tr><th>Field</th><th class="num">Value</th><th>From</th><th>Status</th></tr></thead>
-        <tbody>${sections[s].map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${esc(r.value)}</td>
+    return `<div class="section src-group"><h2>Taken from the sources</h2>
+      <p class="section-note">The fact find, made from the consented reports: the bank statements and credit report have priority over anything the customer entered. Where the customer said something different, it is shown beside the source's figure. In the service, the broker can keep the customer's figure instead, with a reason.</p>
+      ${D.sections.map((name) => [name, sections[name].filter((r) => r.value !== "")]).map(([name, rows]) => rows.length ? `
+      <div class="detail-block src-group"><div class="detail-block-header">${esc(name)}</div>
+        <div class="table-wrap"><table><thead><tr><th>Field</th><th class="num">Figure</th><th>From</th><th class="num">Customer said</th><th>Status</th></tr></thead>
+        <tbody>${rows.map((r) => `<tr data-src="${esc(r.src)}"><td>${esc(r.label)}</td><td class="num">${esc(r.value)}</td>
           <td class="small muted">${esc(r.origin ? SOURCE[r.origin] || label(r.origin) : "")}</td>
-          <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
+          <td class="num small muted">${esc(r.said)}</td>
+          <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>` : "").join("")}</div>`;
+  }
+
+  // The source picker: everything merged, one bank account, or one credit report.
+  function pickerHtml(c) {
+    const opts = [["all", "All sources, merged"]];
+    c.parties.forEach((p) => {
+      ((c.accounts[p.key] || {}).accounts || []).forEach((a) => opts.push(["acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]));
+      const packed = c.pack.parties.find((x) => x.key === p.key);
+      if (packed && packed.credit) opts.push(["credit:" + p.key, `${p.name} · credit report`]);
+    });
+    return opts.length > 1 ? `<div class="source-picker"><span class="small muted">Show</span>${opts.map(([v, n]) =>
+      `<button class="${v === pick ? "btn-primary" : "btn-secondary"}" data-pick="${esc(v)}">${esc(n)}</button>`).join("")}</div>` : "";
+  }
+  function applyPick() {
+    document.querySelectorAll("#case-view [data-src]").forEach((el) =>
+      el.classList.toggle("src-off", el.dataset.src.split(" ").indexOf(pick) < 0));
+    Array.from(document.querySelectorAll("#case-view .src-group")).reverse().forEach((g) =>
+      g.classList.toggle("src-off", !g.querySelector("[data-src]:not(.src-off)")));
   }
 
   // ---- outputs --------------------------------------------------------------------------------
@@ -910,18 +981,23 @@
   // Full income and expenditure, at the front of the case: each person's
   // (and the company's) month by month, every account merged.
   function breakdownHtml(c) {
-    const blocks = c.parties.filter((p) => (c.months[p.key] || []).length).map((p) => {
-      const b = E.breakdown(c, p.key);
+    const each = [];
+    c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => {
+      each.push([p, null, "all", p.name]);
+      ((c.accounts[p.key] || {}).accounts || []).forEach((a) => each.push([p, a.id, "acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]));
+    });
+    const blocks = each.map(([p, account, src, title]) => {
+      const b = E.breakdown(c, p.key, account);
       const head = (title) => `<thead><tr><th>${title}</th>${b.months.map((m) => `<th class="num">${esc(monthLabel(m))}</th>`).join("")}<th class="num">Average</th></tr></thead>`;
       const row = (label, r, strong) => `<tr><td>${strong ? `<strong>${esc(label)}</strong>` : esc(label)}</td>${r.months.map((v) => `<td class="num">${strong ? `<strong>${gbp(v)}</strong>` : gbp(v)}</td>`).join("")}<td class="num"><strong>${gbp(r.average)}</strong></td></tr>`;
       const body = p.role === "COMPANY"
         ? `<table>${head("Business account")}<tbody>${row("Money in", b.moneyIn)}${row("Money out", b.moneyOut)}</tbody></table>`
         : `<table>${head("Full income")}<tbody>${b.income.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No income identified.</td></tr>'}${row("Total income", b.incomeTotal, true)}</tbody></table>
            <table style="margin-top:12px">${head("Full expenditure")}<tbody>${b.expenditure.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No spending identified.</td></tr>'}${row("Total expenditure", b.expenditureTotal, true)}</tbody></table>`;
-      return `<div class="detail-block"><div class="detail-block-header">${esc(p.name)}</div><div class="table-wrap">${body}</div></div>`;
+      return `<div class="detail-block" data-src="${esc(src)}"><div class="detail-block-header">${esc(title)}</div><div class="table-wrap">${body}</div></div>`;
     }).join("");
-    return blocks ? `<div class="section"><h2>Income and expenditure</h2>
-      <p class="section-note">From Open Banking, month by month over complete months, every account merged. Each account, and the credit report, are shown on their own further down.</p>${blocks}</div>` : "";
+    return blocks ? `<div class="section src-group"><h2>Income and expenditure</h2>
+      <p class="section-note">From the bank statements, month by month over complete months. All sources shows every account merged; pick an account above to see it on its own.</p>${blocks}</div>` : "";
   }
 
   // Each credit report on its own, as it arrived.
@@ -930,14 +1006,14 @@
       const cr = p.credit, accounts = cr.accounts || [];
       const bits = [cr.score ? `score ${cr.score}` : "", cr.on_electoral_roll === true ? "on the electoral roll" : cr.on_electoral_roll === false ? "not on the electoral roll" : ""].filter(Boolean).join(" · ");
       const courts = (cr.adverse || []).filter((a) => !a.lender).map((a) => `<p class="small" style="margin:6px 0 0">${esc(a.type)}${a.amount ? " " + gbp(a.amount) : ""}${a.date ? ", " + esc(a.date) : ""} · ${a.satisfied ? "satisfied" : "unsatisfied"}</p>`).join("");
-      return `<div class="detail-block"><div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">${esc(bits)}</span></div>
+      return `<div class="detail-block" data-src="all credit:${esc(p.key)}"><div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">${esc(bits)}</span></div>
         <div class="table-wrap"><table><thead><tr><th>Lender</th><th>Type</th><th>Status</th><th class="num">Balance</th><th class="num">Monthly</th><th class="num">Limit</th></tr></thead>
         <tbody>${accounts.map((a) => `<tr><td>${esc(a.lender)}</td><td>${esc(label(a.type))}</td>
           <td>${pill(["ACTIVE", "SETTLED"].includes(a.status) ? "derived" : "alert", a.status)}</td><td class="num">${gbp(a.balance)}</td>
           <td class="num">${gbp(a.monthly_payment)}</td><td class="num">${a.credit_limit ? gbp(a.credit_limit) : "–"}</td></tr>`).join("")
           || '<tr><td colspan="6" class="small">No accounts on the report.</td></tr>'}</tbody></table></div>${courts}</div>`;
     }).join("");
-    return reports ? `<div class="section"><h2>Credit report</h2>${reports}</div>` : "";
+    return reports ? `<div class="section src-group"><h2>Credit report</h2>${reports}</div>` : "";
   }
 
   function renderCase() {
@@ -964,12 +1040,12 @@
     const accountName = {};
     Object.values(c.accounts).forEach((acc) => acc.accounts.forEach((a) => { accountName[a.id] = `${a.provider} ${a.account}`; }));
     const codes = [...new Set(c.transactions.map((t) => t.code).filter(Boolean))].sort();
-    const accountIds = [...new Set(c.transactions.map((t) => t.account).filter((a) => accountName[a]))];
+    const bankSrc = ["all"].concat(Object.values(c.accounts).flatMap((acc) => acc.accounts.map((a) => "acct:" + a.id))).join(" ");
     const toCategorise = Object.values(waiting).map((ts) => {
       const t = ts[0], dates = ts.map((x) => x.date).sort();
       const out = ts.reduce((s, x) => s + Math.max(0, -E.num(x.amount)), 0);
       const inn = ts.reduce((s, x) => s + Math.max(0, E.num(x.amount)), 0);
-      return `<div class="panel finding difference">
+      return `<div class="panel finding difference" data-src="all acct:${esc(t.account || "")}">
         <div class="finding-head">${pill("difference", "TO CATEGORISE")}<span class="finding-source">${esc(names[t.party] || t.party)}${t.provider ? " · provider: " + esc(t.provider) : ""}</span></div>
         <div class="finding-text"><strong>${esc(t.description)}</strong></div>
         <div class="figures"><div><div class="fig-label">Payments</div><div class="fig-value">${ts.length} <span class="small muted">· ${esc(ts.length > 1 ? dates[0] + " to " + dates[dates.length - 1] : dates[0])}</span></div></div>
@@ -980,7 +1056,7 @@
           <button class="btn-primary" data-categorise="${esc(t.id)}">Categorise</button></div></div>`;
     }).join("");
     const txRows = c.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((t) => `
-      <tr data-code="${esc(t.code || "")}" data-account="${esc(t.account || "")}"${(txCode && t.code !== txCode) || (txAccount && t.account !== txAccount) ? ' style="display:none"' : ""}><td class="mono">${esc(t.date)}</td>
+      <tr data-code="${esc(t.code || "")}" data-src="all acct:${esc(t.account || "")}"${txCode && t.code !== txCode ? ' style="display:none"' : ""}><td class="mono">${esc(t.date)}</td>
         <td class="mono" title="${esc(CODES[t.code] || "")}">${esc(t.code || "–")}</td><td class="small muted">${esc(accountName[t.account] || "")}</td>
         <td>${esc(t.description)}${t.provider ? `<br><span class="mono muted">${esc(t.provider)}</span>` : ""}</td>
         <td class="num">${gbp(t.amount)}</td>${business.has(t.party)
@@ -990,7 +1066,6 @@
           <label class="check"><input type="checkbox" data-row-remember="${esc(t.id)}" /> remember</label>
           <button class="btn-secondary" data-change="${esc(t.id)}">Change</button></div></td></tr>`}`).join("");
 
-    const taken = c.findings.filter((f) => f.decision && f.decision.default);
     const decided = c.findings.filter((f) => f.decision && !f.decision.default && f.decision.kind !== "RESOLVED");
     const matches = c.findings.filter((f) => f.outcome === "MATCH");
     const audit = ff.audit.slice().reverse().map((e) => `
@@ -1012,29 +1087,23 @@
         <button class="btn-secondary" id="dl-pack">Download Data Pack</button>
         <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
       </div>
+      ${pickerHtml(c)}
 
       ${breakdownHtml(c)}
 
-      ${glanceHtml(c)}
+      <div data-src="all">${glanceHtml(c)}</div>
 
-      <div class="section"><h2>Sources</h2>${sources}</div>
+      ${takenHtml(c)}
 
-      ${c.transactions.length ? `<div class="section"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
+      <div class="section" data-src="all"><h2>Sources</h2>${sources}</div>
+
+      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
         <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
         ${bankingHtml(c)}</div>` : ""}
 
       ${creditHtml(c)}
 
-      ${taken.length ? `<div class="section"><h2>Taken from the sources<span class="count">${taken.length}</span></h2>
-        <p class="section-note">The fact find is made with the reports' figures, not what the customer entered. Each one is on the audit trail. In the service, the broker can keep the customer's figure instead, with a reason.</p>
-        ${taken.map((f) => `<div class="panel finding">
-          <div class="finding-head">${pill(f.action === "ADD_COMMITMENT" ? "added" : "replaced", f.action === "ADD_COMMITMENT" ? "ADDED" : "REPLACED")}
-            <span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
-          <div class="finding-text">${esc(f.message)}</div>
-          <div class="figures"><div><div class="fig-label">Entered</div><div class="fig-value money">${f.declared ? gbp(f.declared) : "–"}</div></div>
-            <div><div class="fig-label">Now</div><div class="fig-value money new">${gbp(f.proposed)}</div></div></div></div>`).join("")}</div>` : ""}
-
-      <div class="section"><h2>To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
+      <div class="section" data-src="all"><h2>To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
         ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
         ${decided.length ? `<details class="payments-detail"><summary>Decided (${decided.length})</summary>
           ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered"} · ${esc(f.decision.by)}</div>
@@ -1047,20 +1116,17 @@
         </div>
       </div>
 
-      ${c.transactions.length ? `<div class="section"><h2>Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
+      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
         <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which.</p>
         ${toCategorise}
         <details class="payments-detail"><summary>All categorised transactions (${c.transactions.length}) – how each was placed</summary>
           <div class="inline-form" style="margin:10px 0">
             <label class="check">Code <select id="tx-code"><option value="">All</option>${codes.map((k) => `<option value="${esc(k)}" ${k === txCode ? "selected" : ""}>${esc(k)} – ${esc(CODES[k] || k)}</option>`).join("")}</select></label>
-            <label class="check">Account <select id="tx-account"><option value="">All</option>${accountIds.map((a) => `<option value="${esc(a)}" ${a === txAccount ? "selected" : ""}>${esc(accountName[a])}</option>`).join("")}</select></label>
             <span class="small muted" id="tx-count"></span></div>
           <div class="table-wrap"><table><thead><tr><th>Date</th><th>Code</th><th>Account</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th><th></th></tr></thead>
           <tbody id="tx-rows">${txRows}</tbody></table></div></details></div>` : ""}
 
-      <div class="section"><h2>Fact find and budget planner<span class="count">C2C Mortgage Expenditure Form</span></h2>${factfindSections(c)}</div>
-
-      <div class="section"><h2>Outputs</h2>
+      <div class="section" data-src="all"><h2>Outputs</h2>
         <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
           <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option>
             ${D.templates.map((t) => { const ready = state.templates[t.id] && state.templates[t.id].saved;
@@ -1069,7 +1135,7 @@
           ${outputs ? `<div class="table-wrap" style="margin-top:12px"><table><tbody>${outputs}</tbody></table></div>` : ""}</div>
       </div>
 
-      <div class="section"><h2>Audit trail</h2>
+      <div class="section" data-src="all"><h2>Audit trail</h2>
         ${audit ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Field</th><th class="num">Was</th><th class="num">Now</th><th>From</th></tr></thead><tbody>${audit}</tbody></table></div>`
                 : '<p class="small">No changes yet. Accepting a figure or categorising a transaction records it here.</p>'}
       </div>
@@ -1078,14 +1144,22 @@
 
     $("case-back").addEventListener("click", () => showView("portal"));
     const filterRows = () => {
-      const rows = document.querySelectorAll("#tx-rows tr"); let shown = 0;
-      rows.forEach((r) => { const on = (!txCode || r.dataset.code === txCode) && (!txAccount || r.dataset.account === txAccount);
-                            r.style.display = on ? "" : "none"; if (on) shown++; });
-      if ($("tx-count")) $("tx-count").textContent = txCode || txAccount ? `${shown} of ${rows.length}` : "";
+      let shown = 0, all = 0;
+      document.querySelectorAll("#tx-rows tr").forEach((r) => {
+        const on = !txCode || r.dataset.code === txCode;
+        r.style.display = on ? "" : "none";
+        if (!r.classList.contains("src-off")) { all++; if (on) shown++; }
+      });
+      if ($("tx-count")) $("tx-count").textContent = txCode ? `${shown} of ${all}` : "";
     };
+    document.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
+      pick = b.dataset.pick;
+      document.querySelectorAll("[data-pick]").forEach((x) => { x.className = x.dataset.pick === pick ? "btn-primary" : "btn-secondary"; });
+      applyPick(); filterRows();
+    }));
+    applyPick();
     if ($("tx-code")) {
       $("tx-code").addEventListener("change", (e) => { txCode = e.target.value; filterRows(); });
-      $("tx-account").addEventListener("change", (e) => { txAccount = e.target.value; filterRows(); });
       filterRows();
     }
     document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
