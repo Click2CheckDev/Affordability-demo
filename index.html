@@ -588,7 +588,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s === null || s === undefined ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const gbp = (v) => (v === null || v === undefined || v === "") ? "–" : "£" + E.fmt(v);
+  const gbp = (v) => (v === null || v === undefined || v === "") ? "–" : E.num(v) < 0 ? "-£" + E.fmt(-E.num(v)) : "£" + E.fmt(v);
   const SOURCE = { HMRC_PAYROLL: "HMRC payroll", HMRC_SA: "HMRC SA302", OPEN_BANKING: "Open Banking",
                    CREDIT_FILE: "Credit report", AML: "AML search", IDV: "ID check", COMPANY_REPORT: "Company report",
                    CREDIT: "Credit report", COMPANY_PROFILE: "Company report", HMRC: "HMRC", BROKER: "Broker",
@@ -950,7 +950,7 @@
 
   // The source picker: everything merged, one bank account, or one credit report.
   function pickerHtml(c) {
-    const opts = [["all", "All sources, merged"]];
+    const opts = [["all", "Household · all sources"]];
     c.parties.forEach((p) => {
       ((c.accounts[p.key] || {}).accounts || []).forEach((a) => opts.push(["acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]));
       const packed = c.pack.parties.find((x) => x.key === p.key);
@@ -979,12 +979,56 @@
     return fillTemplate(t, st, c, button);
   }
 
-  // Full income and expenditure, at the front of the case: each person's
-  // (and the company's) month by month, every account merged.
+  // The whole point of affordability: every income and outgoing of the
+  // household added together, a column for each bank account so you can see
+  // which is doing what (cases/screens.household). A company's accounts are a
+  // block of their own, read by money in and out.
+  function household(c) {
+    return [false, true].map((company) => {
+      const cols = [];
+      c.parties.filter((p) => (p.role === "COMPANY") === company && (c.months[p.key] || []).length).forEach((p) =>
+        ((c.accounts[p.key] || {}).accounts || []).forEach((a) =>
+          cols.push({ who: p.name, account: `${a.provider} ${a.account}`, b: E.breakdown(c, p.key, a.id) })));
+      if (!cols.length) return null;
+      const r2 = (v) => Math.round(v * 100) / 100;
+      const table = (kind) => {
+        const each = cols.map((col) => Object.fromEntries(col.b[kind].map((r) => [r.category, r.average])));
+        const cats = [...new Set(each.flatMap(Object.keys))]
+          .sort((x, y) => each.reduce((s, e) => s + (e[y] || 0), 0) - each.reduce((s, e) => s + (e[x] || 0), 0));
+        const rows = cats.map((k) => ({ label: CAT[k] || k, values: each.map((e) => e[k] === undefined ? null : e[k]),
+                                        total: r2(each.reduce((s, e) => s + (e[k] || 0), 0)) }));
+        const totals = each.map((e) => r2(Object.values(e).reduce((s, v) => s + v, 0)));
+        return [rows, { values: totals, total: r2(totals.reduce((s, v) => s + v, 0)) }];
+      };
+      if (company) {
+        const line = (key) => { const v = cols.map((col) => col.b[key].average); return { values: v, total: r2(v.reduce((s, x) => s + x, 0)) }; };
+        return { company: true, cols: cols, moneyIn: line("moneyIn"), moneyOut: line("moneyOut") };
+      }
+      const [income, incomeTotal] = table("income"), [spending, spendingTotal] = table("expenditure");
+      const left = incomeTotal.values.map((v, i) => r2(v - spendingTotal.values[i]));
+      return { company: false, cols: cols, income: income, incomeTotal: incomeTotal, expenditure: spending,
+               expenditureTotal: spendingTotal, left: { values: left, total: r2(left.reduce((s, v) => s + v, 0)) } };
+    }).filter(Boolean);
+  }
+  function householdHtml(c) {
+    return household(c).map((h) => {
+      const cell = (v) => v === null ? '<span class="muted">–</span>' : gbp(v);
+      const row = (label, r, strong) => `<tr><td>${strong ? `<strong>${esc(label)}</strong>` : esc(label)}</td>${r.values.map((v) => `<td class="num">${strong ? `<strong>${cell(v)}</strong>` : cell(v)}</td>`).join("")}<td class="num"><strong>${gbp(r.total)}</strong></td></tr>`;
+      const band = (t) => `<tr><td colspan="99" class="small muted" style="text-transform:uppercase;letter-spacing:.05em">${t}</td></tr>`;
+      const body = h.company ? row("Money in", h.moneyIn) + row("Money out", h.moneyOut)
+        : band("Income") + h.income.map((r) => row(r.label, r)).join("") + row("Total income", h.incomeTotal, true)
+          + band("Expenditure") + h.expenditure.map((r) => row(r.label, r)).join("") + row("Total expenditure", h.expenditureTotal, true)
+          + row("Left over (income less expenditure)", h.left, true);
+      return `<div class="detail-block" data-src="all"><div class="detail-block-header">${h.company ? "The business" : "The household"} <span class="muted" style="font-weight:400">· a month, every account added together</span></div>
+        <div class="table-wrap"><table><thead><tr><th></th>${h.cols.map((col) => `<th class="num">${esc(col.who)}<br><span class="muted" style="font-weight:400">${esc(col.account)}</span></th>`).join("")}<th class="num">${h.company ? "Business" : "Household"}</th></tr></thead>
+        <tbody>${body}</tbody></table></div></div>`;
+    }).join("");
+  }
+
+  // Each account month by month, for when one is picked.
   function breakdownHtml(c) {
     const each = [];
     c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => {
-      each.push([p, null, "all", p.name]);
       ((c.accounts[p.key] || {}).accounts || []).forEach((a) => each.push([p, a.id, "acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]));
     });
     const blocks = each.map(([p, account, src, title]) => {
@@ -998,7 +1042,7 @@
       return `<div class="detail-block" data-src="${esc(src)}"><div class="detail-block-header">${esc(title)}</div><div class="table-wrap">${body}</div></div>`;
     }).join("");
     return blocks ? `<div class="section src-group"><h2>Income and expenditure</h2>
-      <p class="section-note">From the bank statements, month by month over complete months. All sources shows every account merged; pick an account above to see it on its own.</p>${blocks}</div>` : "";
+      <p class="section-note">From the bank statements. Household · all sources adds up every account in the household, with a column for each so you can see which account is doing what; pick an account above to see it month by month.</p>${householdHtml(c)}${blocks}</div>` : "";
   }
 
   // Each credit report on its own, as it arrived.
@@ -1019,9 +1063,9 @@
 
   function renderCase() {
     const c = currentCase, ff = c.factfind;
-    const open = openFindings(c);
-    const order = { DIFFERENCE: 0, ALERT: 1, UNVERIFIABLE: 2 };
-    open.sort((a, b) => order[a.outcome] - order[b.outcome]);
+    // Alerts and items to check are worth knowing, not decisions.
+    const open = openFindings(c).filter((f) => f.outcome === "DIFFERENCE");
+    const notes = openFindings(c).filter((f) => f.outcome !== "DIFFERENCE");
     const complete = c.status === "COMPLETE";
     const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -1106,6 +1150,9 @@
 
       <div class="section" data-src="all"><h2>To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
         ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
+        ${notes.length ? `<h3 style="margin:18px 0 8px;font-size:15px;font-weight:500">Worth knowing</h3>${notes.map((f) => `<div class="panel finding ${f.outcome.toLowerCase()}">
+          <div class="finding-head">${pill(f.outcome.toLowerCase(), OUTCOME[f.outcome] || f.outcome)}<span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
+          <div class="finding-text">${esc(f.message)}</div></div>`).join("")}` : ""}
         ${decided.length ? `<details class="payments-detail"><summary>Decided (${decided.length})</summary>
           ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered"} · ${esc(f.decision.by)}</div>
             <div class="small">${esc(f.message)}${f.decision.reason ? `<br><em>“${esc(f.decision.reason)}”</em>` : ""}</div></div>`).join("")}</details>` : ""}
@@ -1267,20 +1314,32 @@
           theme: "grid", styles: { fontSize: 8.5, cellPadding: 4 }, headStyles: { fillColor: pink },
           margin: { left: 40, right: 40, top: 50 }, didDrawPage: () => watermark() });
       };
-      // Full income and expenditure first.
-      c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => {
-        const b = E.breakdown(c, p.key), head = b.months.map(monthLabel).concat(["Average"]);
+      // The household added together first, a column for each account.
+      household(c).forEach((h) => {
+        const head = [""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.company ? "Business" : "Household"]);
+        const line = (label, r) => [label].concat(r.values.map((v) => v === null ? "–" : gbp(v)), [gbp(r.total)]);
+        const blank = (t) => [t].concat(h.cols.map(() => ""), [""]);
+        table(h.company ? "The business, a month" : "The household, a month: every account added together", head,
+              h.company ? [line("Money in", h.moneyIn), line("Money out", h.moneyOut)]
+                : [blank("Income")].concat(h.income.map((r) => line(r.label, r)), [line("Total income", h.incomeTotal), blank("Expenditure")],
+                                         h.expenditure.map((r) => line(r.label, r)), [line("Total expenditure", h.expenditureTotal),
+                                         line("Left over (income less expenditure)", h.left)]));
+      });
+      // Then each account month by month.
+      c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => {
+        const b = E.breakdown(c, p.key, a.id), head = b.months.map(monthLabel).concat(["Average"]);
+        const title = `${p.name} · ${a.provider} ${a.account}`;
         const line = (label, r) => [label].concat(r.months.map(gbp), [gbp(r.average)]);
         if (p.role === "COMPANY") {
-          table(`Income and expenditure · ${p.name}`, ["Business account"].concat(head),
+          table(title, ["Business account"].concat(head),
                 [line("Money in", b.moneyIn), line("Money out", b.moneyOut)]);
           return;
         }
-        table(`Income and expenditure · ${p.name}`, ["Full income"].concat(head),
+        table(title, ["Full income"].concat(head),
               b.income.map((r) => line(CAT[r.category] || r.category, r)).concat([line("Total income", b.incomeTotal)]));
         table(" ", ["Full expenditure"].concat(head),
               b.expenditure.map((r) => line(CAT[r.category] || r.category, r)).concat([line("Total expenditure", b.expenditureTotal)]));
-      });
+      }));
       table("At a glance", ["Measure", "Value"], [
         ["Disposable income a month", gbp(g.disposable)], ["Outgoings a month", gbp(g.outgoings)],
         ["Net monthly income", gbp(s.net_monthly_income)], ["Household gross income a year", gbp(s.gross_annual_income)],
