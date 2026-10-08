@@ -408,6 +408,11 @@
   .inline-form label.check { font-size: 12.5px; color: var(--ink); display: inline-flex; gap: 6px; align-items: center; }
   .btn-primary:disabled, .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
   .money { font-variant-numeric: tabular-nums; }
+  .case-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 16px; }
+  .case-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+  .case-actions button { width: auto; padding: 9px 16px; font-size: 13px; }
+  .link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--brand); cursor: pointer; text-align: left; text-decoration: underline; }
+  .inline-form select { max-width: 220px; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .table-wrap { overflow-x: auto; margin-bottom: 8px; }
   .row .value .status-pill { margin-left: 8px; }
@@ -468,10 +473,10 @@
   <div class="header-logo">
     <img src="logo.png" alt="Click2Check" class="logo-img" width="120" height="30" onerror="this.style.display='none'" />
   </div>
-  <h1 id="page-title">ABC Ltd cases</h1>
+  <h1 id="page-title">Cases</h1>
   <select id="mobile-nav" aria-label="Go to">
     <option value="portal">Cases</option><option value="new">New case</option>
-    <option value="templates">Firm templates</option><option value="how">How it works</option>
+    <option value="templates">Templates</option><option value="how">How it works</option>
   </select>
   <div class="welcome">
     Welcome, ABC Ltd
@@ -485,7 +490,7 @@
   <nav class="sidebar-nav">
     <button class="sidebar-link active" data-view="portal">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
-      ABC Ltd cases
+      Cases
     </button>
     <button class="sidebar-link" data-view="new">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
@@ -493,7 +498,7 @@
     </button>
     <button class="sidebar-link" data-view="templates">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>
-      Firm templates
+      Templates
     </button>
     <button class="sidebar-link" data-view="how">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
@@ -513,20 +518,20 @@
   <div id="portal-view" class="card portal-card">
     <div class="portal-header">
       <div>
-        <div class="eyebrow muted">Affordability</div>
-        <h1 class="title" style="font-size:26px;">ABC Ltd</h1>
-        <p class="subtitle">Each case brings the customer's credit report and Open Banking together, checks them against what the customer entered, and fills the fact find and budget planner.</p>
+        <div class="eyebrow muted">Affordability · ABC Ltd</div>
+        <h1 class="title" style="font-size:26px;">Cases</h1>
+        <p class="subtitle">Every affordability case opened by this firm: credit report and Open Banking, checked against what the customer entered.</p>
       </div>
     </div>
     <div class="stat-row four">
-      <div class="stat-box brand"><div class="stat-value" id="stat-total"></div><div class="stat-label">Cases</div></div>
+      <div class="stat-box brand"><div class="stat-value" id="stat-total"></div><div class="stat-label">Total cases</div></div>
       <div class="stat-box"><div class="stat-value" id="stat-commercial"></div><div class="stat-label">Commercial</div></div>
       <div class="stat-box teal"><div class="stat-value" id="stat-residential"></div><div class="stat-label">Residential</div></div>
       <div class="stat-box"><div class="stat-value" id="stat-open"></div><div class="stat-label">Differences open</div></div>
     </div>
     <div class="table-wrap">
     <table class="case-table">
-      <thead><tr><th>Applicants</th><th>Category</th><th>Status</th><th>Open items</th><th>Reference</th><th>Opened</th></tr></thead>
+      <thead><tr><th>Applicants</th><th>Category</th><th>Status</th><th>To decide</th><th>Reference</th><th>Opened</th></tr></thead>
       <tbody id="case-list"></tbody>
     </table>
     </div>
@@ -554,7 +559,7 @@
       <li><strong>Open Banking aggregate.</strong> Accounts connected twice are merged, overlapping feeds de-duplicated, transfers between the customer's own accounts paired, and every transaction placed on a budget planner line. <span class="tag code">RULES · ACCOUNTSCORE MAP · MERCHANT MEMORY · TRAINED MODEL</span></li>
       <li><strong>C2C Data Pack.</strong> Every party's credit report and banking in one file. Residential and commercial use the same model; a commercial case adds the company, and each director gets the same personal checks.</li>
       <li><strong>Validate.</strong> What the customer entered is compared with both sources: income against pay into the bank, commitments against the credit report and the bank, spending against the bank. Differences are flagged, not changed.</li>
-      <li><strong>Broker and customer decide.</strong> The hub sends the customer a link; they open it without signing in and confirm or dispute each change. The broker records the rest. Every decision goes on the audit trail, with who made it. <span class="tag code">NO AI ON A CASE</span></li>
+      <li><strong>Broker and customer decide.</strong> The broker (or the hub) sends the customer a link; they open it without signing in and confirm or dispute each change. The broker records the rest. Every decision goes on the audit trail, with who made it. <span class="tag code">NO AI ON A CASE</span></li>
       <li><strong>Fact find and budget planner.</strong> Populated and validated, on the lines of the C2C Mortgage Expenditure Form, with where each figure came from.</li>
       <li><strong>Fill any template.</strong> The C2C form, or the firm's or lender's own PDF, Excel or form fields. AI proposes how a new template maps; a person approves it once, and from then on it fills every case. <span class="tag ai">AI PROPOSES · PERSON APPROVES</span></li>
       <li><strong>Back to the hub.</strong> The hub is told when the case opens, when the customer answers, when the broker approves, and when a form or case report is ready. Each notice is signed and carries no personal data; the hub fetches the case with its own key.</li>
@@ -580,15 +585,17 @@
   "use strict";
   const D = window.DEMO, E = window.Engine, AI = window.SIMULATED_AI || {};
   const WHO = "Demo adviser";
-  const KEY = "c2c-affordability-demo-v2";
+  const KEY = "c2c-affordability-demo-v3";
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s === null || s === undefined ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const gbp = (v) => (v === null || v === undefined || v === "") ? "–" : "£" + E.fmt(v);
   const SOURCE = { HMRC_PAYROLL: "HMRC payroll", HMRC_SA: "HMRC SA302", OPEN_BANKING: "Open Banking",
-                   CREDIT_FILE: "Credit file", AML: "AML search", IDV: "ID check", COMPANY_REPORT: "Company report",
-                   CREDIT: "Credit file", COMPANY_PROFILE: "Company report", HMRC: "HMRC", BROKER: "Broker",
+                   CREDIT_FILE: "Credit report", AML: "AML search", IDV: "ID check", COMPANY_REPORT: "Company report",
+                   CREDIT: "Credit report", COMPANY_PROFILE: "Company report", HMRC: "HMRC", BROKER: "Broker",
                    C2C: "C2C", CUSTOMER: "Customer" };
+  const OUTCOME = { DIFFERENCE: "DIFFERENCE", ALERT: "ALERT", UNVERIFIABLE: "TO CHECK", MATCH: "MATCH" };
+  const label = (v) => SOURCE[v] || (String(v).charAt(0) + String(v).slice(1).toLowerCase()).replace(/_/g, " ");
   const BASIS = { RULE: "Rule", PROVIDER: "AccountScore category", MEMORY: "Merchant memory",
                   OVERRIDE: "Broker", PATTERN: "Regular pay", MODEL: "Trained model",
                   MATCHED_TRANSFER: "Own transfer", NONE: "Needs a broker" };
@@ -633,10 +640,10 @@
     }
     return people.join(" & ");
   }
+  // The service's case states: Collecting sources, Broker review, Complete.
   function statusPill(c) {
-    return c.status === "APPROVED" ? pill("delivered", "APPROVED") :
-      c.status === "COLLECTING" ? pill("polling", "COLLECTING") :
-      blocking(c) ? pill("awaiting_consent", "BROKER REVIEW") : pill("ready", "READY TO APPROVE");
+    return c.status === "COMPLETE" ? pill("delivered", "COMPLETE") :
+      c.status === "COLLECTING" ? pill("polling", "COLLECTING SOURCES") : pill("awaiting_consent", "BROKER REVIEW");
   }
   function download(blob, name) {
     const a = document.createElement("a");
@@ -652,10 +659,10 @@
   const dateLong = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // ---- navigation -----------------------------------------------------------------------
-  let currentCase = null, banner = "";
+  let currentCase = null, banner = "", freshLink = null;
   const VIEWS = ["portal", "new", "case", "customer", "templates", "how"];
-  const TITLES = { portal: "ABC Ltd cases", new: "New case", case: "ABC Ltd cases",
-                   customer: "Customer view", templates: "Firm templates", how: "How it works" };
+  const TITLES = { portal: "Cases", new: "New case", case: "Cases",
+                   customer: "Customer view", templates: "Templates", how: "How it works" };
   function showView(view) {
     VIEWS.forEach((v) => $(v + "-view").classList.toggle("hidden", v !== view));
     document.querySelectorAll(".sidebar-link").forEach((b) =>
@@ -672,6 +679,11 @@
   $("reset-btn").addEventListener("click", () => { state = fresh(); save(); currentCase = null; showView("portal"); });
 
   // ---- case list --------------------------------------------------------------------------
+  function toDecide(c) {
+    const d = blocking(c), o = openFindings(c).length;
+    return d ? pill("difference", `${d} DIFFERENCE${d > 1 ? "S" : ""}`)
+      : o ? `<span class="muted">${o} to check</span>` : '<span class="muted">—</span>';
+  }
   function renderPortal() {
     $("stat-total").textContent = state.cases.length;
     $("stat-commercial").textContent = state.cases.filter((c) => c.type === "COMMERCIAL").length;
@@ -682,9 +694,9 @@
         <td>${esc(caseTitle(c))}</td>
         <td><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span></td>
         <td>${statusPill(c)}</td>
-        <td>${openFindings(c).length}</td>
+        <td>${toDecide(c)}</td>
         <td class="mono">${esc(c.reference)}</td>
-        <td>${esc(new Date(c.opened).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</td>
+        <td>${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</td>
       </tr>`).join("");
     document.querySelectorAll("#case-list tr").forEach((tr) =>
       tr.addEventListener("click", () => openCase(state.cases[+tr.dataset.i])));
@@ -694,33 +706,35 @@
   function renderNewCase() {
     const view = $("new-view");
     view.innerHTML = `
-      <div class="eyebrow">New case</div>
-      <h1 class="title">Open an affordability case</h1>
-      <p class="subtitle">Affordability starts after the hub has each person's credit report and Open Banking, so the case opens with both and is checked straight away.</p>
+      <div class="eyebrow">Affordability</div>
+      <h1 class="title">New case</h1>
+      <p class="subtitle">Affordability starts once the hub has each person's credit report and Open Banking, so the case opens with both and is checked straight away.</p>
       <div class="grid">
-        <div class="field span2"><label>Category</label>
+        <div class="field"><label>Category</label>
           <select id="nc-type"><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select></div>
+        <div class="field"><label>Reference</label><input id="nc-reference" placeholder="Your case reference" /></div>
+        <div class="field span2"><label>Adviser</label><input id="nc-adviser" value="${esc(WHO)}" /></div>
         <div class="field span2 hidden" id="nc-company-row"><label>Company name</label><input id="nc-company" placeholder="Jones Plumbing Ltd" /></div>
         <div class="field"><label id="nc-p1-label">Applicant 1 first name</label><input id="nc-p1-first" placeholder="Sarah" /></div>
-        <div class="field"><label>Last name</label><input id="nc-p1-last" placeholder="Jones" /></div>
+        <div class="field"><label>Surname</label><input id="nc-p1-last" placeholder="Jones" /></div>
         <div class="field" id="nc-p2-a"><label>Applicant 2 first name</label><input id="nc-p2-first" placeholder="Tom" /></div>
-        <div class="field" id="nc-p2-b"><label>Last name</label><input id="nc-p2-last" placeholder="Jones" /></div>
+        <div class="field" id="nc-p2-b"><label>Surname</label><input id="nc-p2-last" placeholder="Jones" /></div>
       </div>
       <div class="panel">
-        <p><strong>From the hub, for every person:</strong> <span class="hub-tick">✓</span> Credit report &nbsp; <span class="hub-tick">✓</span> Open Banking <span id="nc-company-sources" class="hidden"><br><strong>For the company:</strong> <span class="hub-tick">✓</span> Company credit report &nbsp; <span class="hub-tick">✓</span> Business Open Banking</span></p>
+        <p><strong>From the hub, for every person:</strong> <span class="hub-tick">✓</span> Credit report &nbsp; <span class="hub-tick">✓</span> Open Banking <span id="nc-company-sources" class="hidden"><br><strong>For the company:</strong> <span class="hub-tick">✓</span> Company report &nbsp; <span class="hub-tick">✓</span> Company credit report &nbsp; <span class="hub-tick">✓</span> Business Open Banking</span></p>
       </div>
       <div class="demo-control">
         <div class="demo-control-label">Demo control &mdash; not part of the product</div>
         <p class="small" style="margin:0">The case uses the sample reports with your names, as the HMRC demo uses fixed test data. The checks you see are the ones the service makes on those reports.</p>
       </div>
-      <button class="btn-primary" id="nc-submit">Open the case</button>`;
+      <button class="btn-primary" id="nc-submit">Open case</button>`;
     const type = $("nc-type");
     const sync = () => {
       const com = type.value === "COMMERCIAL";
       $("nc-company-row").classList.toggle("hidden", !com);
       $("nc-company-sources").classList.toggle("hidden", !com);
       ["nc-p2-a", "nc-p2-b"].forEach((id) => $(id).classList.toggle("hidden", com));
-      $("nc-p1-label").textContent = com ? "Director first name" : "Applicant 1 first name";
+      $("nc-p1-label").textContent = com ? "Director 1 first name" : "Applicant 1 first name";
       $("nc-p1-first").placeholder = com ? "Tom" : "Sarah";
     };
     type.addEventListener("change", sync); sync();
@@ -737,13 +751,12 @@
       .filter(([, v]) => !v);
     if (missing.length) { $(missing[0][0]).focus(); $(missing[0][0]).style.borderColor = "var(--brand)"; return; }
     const def = D.cases[com ? 1 : 0];
-    const variant = def.default_variant;
     const n = ++state.next;
-    const reference = `C2C-DEMO-${com ? "COM" : "RES"}-${String(n).padStart(3, "0")}`;
-    let c = E.makeCase(def, variant, { reference: reference, id: reference,
-                                       opened: new Date().toISOString().slice(0, 10) });
+    const reference = val("nc-reference") || `C2C-DEMO-${com ? "COM" : "RES"}-${String(n).padStart(3, "0")}`;
+    let c = E.makeCase(def, def.default_variant, { reference: reference, id: reference + "#" + n,
+                                                   opened: new Date().toISOString().slice(0, 10) });
     c = E.rename(c, { company: com ? val("nc-company") : null, people: com ? [p1] : [p1, p2] });
-    c.reference = reference; c.id = reference;
+    c.reference = reference; c.id = reference + "#" + n; c.adviser = val("nc-adviser") || WHO;
     c.baseline = JSON.parse(JSON.stringify(c.factfind.data));
     c.status = "REVIEW";
     state.cases.unshift(c); save();
@@ -754,6 +767,7 @@
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
     currentCase = c;
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     showView("case"); renderCase();
   }
 
@@ -780,7 +794,7 @@
       </div>`;
     }
     return `<div class="panel finding ${outcome}">
-      <div class="finding-head">${pill(outcome, f.outcome === "UNVERIFIABLE" ? "TO CHECK" : f.outcome)}
+      <div class="finding-head">${pill(outcome, OUTCOME[f.outcome] || f.outcome)}
         <span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
       <div class="finding-text">${esc(f.message)}</div>
       ${figuresHtml(f)}${actions}</div>`;
@@ -795,17 +809,12 @@
       "</optgroup>").join("") + "</select>";
   }
 
-  function rowHtml(label, value, prov) {
-    const p = prov ? pill((prov.status || "").toLowerCase(), prov.status) : "";
-    return `<div class="row"><span class="label">${esc(label)}</span><span class="value">${value}${p}</span></div>`;
-  }
-
   function glanceHtml(c) {
     const g = E.glance(c), ch = E.changes(c);
     const changed = ch.length ? `<div class="table-wrap"><table>
-        <thead><tr><th>What changed</th><th class="num">Customer entered</th><th class="num">Now</th><th>From</th></tr></thead>
+        <thead><tr><th>What changed</th><th class="num">Customer entered</th><th class="num">Now</th><th>From</th><th>By</th></tr></thead>
         <tbody>${ch.map((x) => `<tr><td>${esc(x.label || fieldLabel(x.path, c))}</td><td class="num">${x.was === null ? "–" : gbp(x.was)}</td>
-          <td class="num"><strong>${gbp(x.now)}</strong></td><td>${esc(SOURCE[x.origin] || x.origin)} · <span class="small">${esc(x.by)}</span></td></tr>`).join("")}</tbody></table></div>`
+          <td class="num"><strong>${gbp(x.now)}</strong></td><td>${esc(SOURCE[x.origin] || x.origin)}</td><td class="small muted">${esc(x.by)}</td></tr>`).join("")}</tbody></table></div>`
       : '<p class="section-note">Nothing has changed from what the customer entered yet. Differences to decide are below.</p>';
     return `<div class="section"><h2>At a glance</h2>
       <div class="stat-row four">
@@ -813,188 +822,240 @@
           <div class="stat-sub">net pay less outgoings</div></div>
         <div class="stat-box"><div class="stat-value money">${gbp(g.outgoings)}</div><div class="stat-label">Outgoings a month</div>
           <div class="stat-sub">on the expenditure form</div></div>
-        <div class="stat-box teal"><div class="stat-value">${g.backed}<span style="font-size:18px;color:var(--muted)"> / ${g.total}</span></div><div class="stat-label">Figures backed by a source</div>
+        <div class="stat-box teal"><div class="stat-value">${g.backed}<span style="font-size:18px;color:var(--muted)"> / ${g.total}</span></div><div class="stat-label">Figures backed by a report</div>
           <div class="stat-sub">confirmed, replaced or added from a report</div></div>
         <div class="stat-box"><div class="stat-value">${g.differences}</div><div class="stat-label">Differences open</div>
-          <div class="stat-sub">${g.alerts ? `${g.alerts} alert(s) to read` : "no alerts"}</div></div>
+          <div class="stat-sub">${g.alerts ? `${g.alerts} alert${g.alerts > 1 ? "s" : ""} to read` : "no alerts"}</div></div>
       </div>${changed}</div>`;
   }
 
-  function aggregateHtml(c) {
+  function bankingHtml(c) {
     return Object.entries(c.accounts).map(([party, acc]) => {
       const p = c.parties.find((x) => x.key === party) || {};
       const steps = p.banking_steps || {};
+      const packed = ((c.pack.parties.find((x) => x.key === party) || {}).banking) || {};
       const only = { ...c, transactions: c.transactions.filter((t) => t.party === party), months: { [party]: c.months[party] || [] } };
       const bank = E.bankLines(only);
+      const waiting = only.transactions.filter((t) => t.category === "UNCATEGORISED").length;
       const lines = D.lines.filter((l) => bank.lines[l.key] && !l.commitment_types.length);
       const credit = D.lines.filter((l) => bank.lines[l.key] && l.commitment_types.length);
       const income = ["SALARY", "BENEFITS", "PENSION_INCOME", "OTHER_INCOME"].filter((k) => bank.byCat[k]);
+      const months = (c.months[party] || []).length;
+      const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
       return `<div class="detail-block">
-        <div class="detail-block-header">${esc(p.name || party)} · ${(c.months[party] || []).length} complete months (${esc(acc.period[0])} to ${esc(acc.period[1])})</div>
+        <div class="detail-block-header">${esc(p.name || party)} · ${plural(months, "complete month")}, ${esc(acc.period[0])} to ${esc(acc.period[1])}</div>
         <div class="detail-cols">
-          <div><div class="detail-label">Connected</div><ul>${acc.connections.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} — ${x.transactions} transactions</li>`).join("")}</ul></div>
-          <div><div class="detail-label">After merging</div><ul>${acc.accounts.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} (${esc(x.kind)}) — ${x.transactions} transactions</li>`).join("")}</ul>
-            <p class="small" style="margin:6px 0 0">${steps.duplicates_removed || 0} duplicates removed · ${steps.transfers_paired || 0} own transfers paired</p></div>
+          <div><div class="detail-label">Connected</div><ul>${acc.connections.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} — ${plural(x.transactions, "transaction")}</li>`).join("")}</ul></div>
+          <div><div class="detail-label">After merging</div><ul>${acc.accounts.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} (${esc(x.kind)}) — ${plural(x.transactions, "transaction")}</li>`).join("")}</ul></div>
         </div>
+        <p class="small" style="margin:8px 0 0">${plural(steps.accounts_connected || 0, "connection")} → ${plural(steps.accounts_after_merge || 0, "account")} · ${steps.duplicates_removed || 0} duplicates removed · ${steps.transfers_paired || 0} own transfers paired${waiting ? ` · ${waiting} to categorise` : ""}</p>
         <div class="table-wrap" style="margin-top:12px"><table>
           <thead><tr><th>Average a month</th><th class="num">£</th></tr></thead>
           <tbody>
-            ${income.map((k) => `<tr><td>${esc(CAT[k])} (in)</td><td class="num">${gbp(bank.byCat[k])}</td></tr>`).join("")}
+            ${income.map((k) => `<tr><td>${esc(CAT[k])} <span class="small">(in)</span></td><td class="num">${gbp(bank.byCat[k])}</td></tr>`).join("")}
             ${lines.map((l) => `<tr><td>${esc(l.label)}</td><td class="num">${gbp(bank.lines[l.key])}</td></tr>`).join("")}
-            ${credit.map((l) => `<tr><td>${esc(l.label)} <span class="small">(checked against the credit file)</span></td><td class="num">${gbp(bank.lines[l.key])}</td></tr>`).join("")}
+            ${credit.map((l) => `<tr><td>${esc(l.label)} <span class="small">(checked against the credit report)</span></td><td class="num">${gbp(bank.lines[l.key])}</td></tr>`).join("")}
             ${bank.byCat.CASH || bank.byCat.UNALLOCATED ? `<tr><td>Cash and general spending <span class="small">(no line on the form)</span></td><td class="num">${gbp((bank.byCat.CASH || 0) + (bank.byCat.UNALLOCATED || 0))}</td></tr>` : ""}
+            ${packed.monthly_credits ? `<tr><td class="muted">All money in / out</td><td class="num muted">${gbp(packed.monthly_credits)} / ${gbp(packed.monthly_debits)}</td></tr>` : ""}
           </tbody></table></div></div>`;
     }).join("");
   }
 
+  // The fact find section by section, as the case screen lists it.
+  function factfindSections(c) {
+    const data = c.factfind.data, prov = c.factfind.provenance;
+    const sections = {}; D.sections.forEach((s) => { sections[s] = []; });
+    const row = (label, path, kind) => {
+      let value = E.getPath(data, path, "");
+      if (value === null || value === undefined) value = "";
+      if (kind === "money" && value !== "") value = gbp(value);
+      const p = prov[path] || {};
+      return { label: label, path: path, value: String(value), origin: p.origin || "", status: p.status || "" };
+    };
+    data.applicants.forEach((a, i) => {
+      const who = a.full_name || `Applicant ${i + 1}`;
+      D.fields.filter((f) => f.path.startsWith("applicants[n]")).forEach((f) =>
+        sections[f.section].push(row(`${who}: ${f.label}`, f.path.replace("[n]", `[${i}]`), f.kind)));
+    });
+    data.commitments.forEach((r, j) => {
+      if (!r) return;
+      const kind = String(r.type || "").replace(/_/g, " ").toLowerCase();
+      sections.Commitments.push(row(`${r.lender} (${kind}, ${r.owner_name || r.owner})`, `commitments[${j}].monthly_payment`, "money"));
+    });
+    D.fields.filter((f) => !/^(applicants|commitments)\[/.test(f.path)).forEach((f) => {
+      if (f.section === "Company" && !data.company) return;
+      sections[f.section].push(row(f.label, f.path, f.kind));
+    });
+    return D.sections.filter((s) => sections[s].length).map((s) => `
+      <div class="detail-block"><div class="detail-block-header">${esc(s)}</div>
+        <div class="table-wrap"><table><thead><tr><th>Field</th><th class="num">Value</th><th>From</th><th>Status</th></tr></thead>
+        <tbody>${sections[s].map((r) => `<tr><td>${esc(r.label)}</td><td class="num">${esc(r.value)}</td>
+          <td class="small muted">${esc(r.origin ? SOURCE[r.origin] || label(r.origin) : "")}</td>
+          <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>`).join("");
+  }
+
+  // ---- the customer's link ------------------------------------------------------------------
+  const linkUrl = (l) => location.href.split("#")[0] + "#answer/" + l.token;
+  const shortTime = (d) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  function linkHtml(c) {
+    const l = c.link;
+    if (!l) return "";
+    if (freshLink === c.id) {
+      return `<div class="panel" style="border-color:var(--brand)">
+        <p style="margin:0"><strong>Link for the customer</strong></p>
+        <p class="small" style="margin:4px 0 0">Send this to the customer. They open it without signing in and confirm or dispute the ${l.questions} change${l.questions === 1 ? "" : "s"} to decide. It works for 14 days and is shown only now; making another link retires this one.</p>
+        <div class="inline-form"><input type="text" id="cust-link" value="${esc(linkUrl(l))}" readonly />
+          <button class="btn-secondary" id="copy-link">Copy</button>
+          <button class="btn-primary" id="open-link">Open</button></div></div>`;
+    }
+    return `<p class="small muted" style="margin:0 0 8px">Customer link made by ${esc(l.by)} on ${esc(shortTime(l.at))} · ${l.answered_at
+      ? `answered ${esc(shortTime(l.answered_at))}`
+      : `waiting for the customer, until ${esc(new Date(l.expires).toLocaleDateString("en-GB", { day: "numeric", month: "short" }))}`}</p>`;
+  }
+  function newLink(c) {
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+    const at = new Date();
+    c.link = { token: token, by: WHO, at: at.toISOString(), questions: forCustomer(c).length,
+               expires: new Date(at.getTime() + 14 * 86400000).toISOString(), answered_at: null };
+    freshLink = c.id; save(); renderCase();
+  }
+
+  // ---- outputs --------------------------------------------------------------------------------
+  function recordOutput(c, kind, filename) {
+    (c.outputs = c.outputs || []).unshift({ kind: kind, filename: filename, by: WHO, at: new Date().toISOString() });
+    save();
+  }
+  function makeOutput(c, kind, button) {
+    if (kind === "report") return downloadReport(c, button);
+    if (kind === "standard") return downloadStandard(c, button);
+    const t = D.templates.find((x) => x.id === kind), st = state.templates[kind];
+    if (!t || !st || !st.saved) { alert("Save that template's mapping first."); return Promise.resolve(); }
+    return fillTemplate(t, st, c, button);
+  }
+
   function renderCase() {
-    const c = currentCase, ff = c.factfind, data = ff.data, prov = ff.provenance;
+    const c = currentCase, ff = c.factfind;
     const open = openFindings(c);
     const order = { DIFFERENCE: 0, ALERT: 1, UNVERIFIABLE: 2 };
     open.sort((a, b) => order[a.outcome] - order[b.outcome]);
+    const complete = c.status === "COMPLETE";
+    const questions = forCustomer(c).length;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-    const sources = c.parties.map((p) => {
-      const steps = p.banking_steps;
-      const bank = steps ? `<div class="small" style="margin-top:8px">Open Banking: ${steps.accounts_connected} connection(s) → ${steps.accounts_after_merge} account(s), ${steps.duplicates_removed} duplicate transactions removed, ${steps.transfers_paired || 0} own transfers paired.</div>` : "";
-      return `<div class="detail-block">
+    const sources = c.parties.map((p) => `<div class="detail-block">
         <div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">· ${esc(p.role.toLowerCase())}</span></div>
         <div class="source-chips">${p.sources.map((s) => pill("delivered", SOURCE[s] || s)).join("")}
-          ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div>${bank}</div>`;
-    }).join("");
+          ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div></div>`).join("");
 
     const waiting = {};
     c.transactions.filter((t) => t.category === "UNCATEGORISED").forEach((t) => {
-      const k = t.party + "|" + t.merchant; (waiting[k] = waiting[k] || []).push(t);
+      const k = t.party + "|" + (t.merchant || t.description); (waiting[k] = waiting[k] || []).push(t);
     });
+    const names = {}; c.parties.forEach((p) => { names[p.key] = p.name; });
     const toCategorise = Object.values(waiting).map((ts) => {
-      const t = ts[0];
+      const t = ts[0], dates = ts.map((x) => x.date).sort();
       const out = ts.reduce((s, x) => s + Math.max(0, -E.num(x.amount)), 0);
+      const inn = ts.reduce((s, x) => s + Math.max(0, E.num(x.amount)), 0);
       return `<div class="panel finding difference">
-        <div class="finding-head">${pill("difference", "TO CATEGORISE")}<span class="finding-source">${esc(t.provider || "No provider category")}</span></div>
-        <div class="finding-text"><strong>${esc(t.description)}</strong> — ${ts.length} payment(s), ${gbp(out)} in total</div>
+        <div class="finding-head">${pill("difference", "TO CATEGORISE")}<span class="finding-source">${esc(names[t.party] || t.party)}${t.provider ? " · provider: " + esc(t.provider) : ""}</span></div>
+        <div class="finding-text"><strong>${esc(t.description)}</strong></div>
+        <div class="figures"><div><div class="fig-label">Payments</div><div class="fig-value">${ts.length} <span class="small muted">· ${esc(ts.length > 1 ? dates[0] + " to " + dates[dates.length - 1] : dates[0])}</span></div></div>
+          ${out ? `<div><div class="fig-label">Out in total</div><div class="fig-value money">${gbp(out)}</div></div>` : ""}
+          ${inn ? `<div><div class="fig-label">In in total</div><div class="fig-value money">${gbp(inn)}</div></div>` : ""}</div>
         <div class="inline-form">${categorySelect("", `data-cat-for="${esc(t.id)}"`)}
-          <label class="check"><input type="checkbox" data-remember-for="${esc(t.id)}" checked /> remember for this merchant</label>
+          <label class="check"><input type="checkbox" data-remember-for="${esc(t.id)}" checked /> remember for this merchant${ts.length > 1 ? ` (moves all ${ts.length})` : ""}</label>
           <button class="btn-primary" data-categorise="${esc(t.id)}">Categorise</button></div></div>`;
     }).join("");
     const txRows = c.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((t) => `
       <tr><td class="mono">${esc(t.date)}</td>
         <td>${esc(t.description)}${t.provider ? `<br><span class="mono muted">${esc(t.provider)}</span>` : ""}</td>
         <td class="num">${gbp(t.amount)}</td><td>${esc(CAT[t.category] || t.category)}</td>
-        <td>${pill(t.basis === "NONE" ? "difference" : ["OVERRIDE", "MEMORY"].includes(t.basis) ? "verified" : "derived", BASIS[t.basis] || t.basis)}</td></tr>`).join("");
-
-    const people = data.applicants.map((a, i) => {
-      const base = `applicants[${i}]`;
-      const inc = ["basic_salary", "bonus", "overtime", "commission", "self_employed_profit"]
-        .filter((f) => E.num(a.income[f]) || (prov[`${base}.income.${f}`] || {}).status !== "DECLARED")
-        .map((f) => rowHtml(fieldLabel(`${base}.income.${f}`).replace(/^Applicant \d /, "").replace(/^./, (x) => x.toUpperCase()),
-                            `<span class="money">${gbp(a.income[f])}</span>`, prov[`${base}.income.${f}`])).join("");
-      return `<div class="group-title">${esc(a.full_name || "Applicant " + (i + 1))} · ${esc((a.role || "").toLowerCase())}</div>
-        ${rowHtml("Date of birth", esc(a.date_of_birth || "–"), prov[base + ".date_of_birth"])}
-        ${a.employer ? rowHtml("Employer", esc(a.employer), prov[base + ".employer"]) : ""}
-        ${inc}
-        ${a.income.net_monthly ? rowHtml("Net monthly pay", `<span class="money">${gbp(a.income.net_monthly)}</span>`, prov[base + ".income.net_monthly"]) : ""}`;
-    }).join("");
-    const commitments = data.commitments.filter(Boolean).map((r, j) => `
-      <tr><td>${esc(r.owner_name || r.owner)}</td><td>${esc(r.lender)}</td><td>${esc(String(r.type).replace(/_/g, " ").toLowerCase())}</td>
-      <td class="num">${gbp(r.balance)}</td><td class="num">${gbp(r.monthly_payment)}</td>
-      <td>${pill(((prov[`commitments[${j}].lender`] || {}).status || "").toLowerCase(), (prov[`commitments[${j}].lender`] || {}).status || "")}</td></tr>`).join("");
-    const planner = D.groups.map((g) => {
-      const rows = D.lines.filter((l) => l.group === g && E.num(data.expenditure[l.key]))
-        .map((l) => rowHtml(l.label, `<span class="money">${gbp(data.expenditure[l.key])}</span>`, prov["expenditure." + l.key])).join("");
-      return `<div class="group-title">${esc(g)}</div>${rows || '<div class="row"><span class="label">Nothing on these lines</span></div>'}`;
-    }).join("");
-    const s = data.summary;
-    const company = data.company ? `<div class="section"><h2>Company</h2>
-      ${rowHtml("Company", esc(data.company.name), prov["company.name"])}
-      ${rowHtml("Company number", esc(data.company.number), prov["company.number"])}
-      ${rowHtml("Monthly turnover", gbp(data.company.monthly_turnover), prov["company.monthly_turnover"])}
-      ${rowHtml("Monthly outgoings (banked)", gbp(data.company.monthly_outgoings), prov["company.monthly_outgoings"])}</div>` : "";
+        <td>${pill(t.basis === "NONE" ? "difference" : ["OVERRIDE", "MEMORY"].includes(t.basis) ? "verified" : "derived", BASIS[t.basis] || t.basis)}</td>
+        <td><div class="inline-form" style="margin:0;flex-wrap:nowrap">${categorySelect(t.category, `data-row-cat="${esc(t.id)}"`)}
+          <label class="check"><input type="checkbox" data-row-remember="${esc(t.id)}" /> remember</label>
+          <button class="btn-secondary" data-change="${esc(t.id)}">Change</button></div></td></tr>`).join("");
 
     const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
     const matches = c.findings.filter((f) => f.outcome === "MATCH");
     const audit = ff.audit.slice().reverse().map((e) => `
       <tr><td class="mono">${esc(String(e.at).slice(0, 16).replace("T", " "))}</td><td>${esc(e.by)}</td>
-        <td>${esc(/^(applicants|expenditure|commitments|company|summary)/.test(e.path) ? fieldLabel(e.path, c) : e.path)}</td><td class="num">${esc(e.old === null ? "–" : e.old)}</td>
+        <td title="${esc(e.path)}">${esc(/^(applicants|expenditure|commitments|company)/.test(e.path) ? fieldLabel(e.path, c) : e.path)}</td><td class="num">${esc(e.old === null ? "–" : e.old)}</td>
         <td class="num">${esc(e.new)}</td><td>${esc(SOURCE[e.origin] || e.origin)}</td></tr>`).join("");
-    const customerCount = forCustomer(c).length;
-    const firstName = (data.applicants[0] || {}).first_name || "the customer";
+    const firstName = (ff.data.applicants[0] || {}).first_name || "the customer";
+    const outputs = (c.outputs || []).map((o, i) => `<tr><td><button class="link-button" data-output="${i}">${esc(o.filename)}</button></td>
+      <td class="small muted">${esc(o.by)} · ${esc(shortTime(o.at))}</td></tr>`).join("");
 
     $("case-view").innerHTML = `
-      <button class="back-link" id="case-back">&larr; Back to ABC Ltd cases</button>
+      <button class="back-link" id="case-back">&larr; All cases</button>
       ${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
       <div class="detail-head"><div>
         <div class="eyebrow muted">${esc(c.reference)}</div>
-        <h1 class="title">${esc(caseTitle(c))}</h1></div>${statusPill(c).replace("status-pill", "status-pill lg")}</div>
-      <dl class="detail-grid">
-        <dt>Category</dt><dd>${esc(c.type.toLowerCase())}</dd>
-        <dt>Adviser</dt><dd>${esc(c.adviser)}</dd>
-        <dt>Opened</dt><dd>${esc(dateLong(c.opened))}</dd>
-      </dl>
+        <h1 class="title">${esc(caseTitle(c))}</h1></div></div>
+      <p class="case-meta"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span> ${statusPill(c)}
+        <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
+      <div class="case-actions">
+        <button class="btn-secondary" id="dl-pack">Download Data Pack</button>
+        <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
+        ${questions && !complete ? `<button class="btn-primary" id="send-customer">Send to the customer</button>` : ""}
+      </div>
+      ${linkHtml(c)}
 
       ${glanceHtml(c)}
 
       <div class="section"><h2>Sources</h2>${sources}</div>
 
-      <div class="section"><h2>To decide<span class="count">${open.length} open</span></h2>
-        ${customerCount ? `<div class="panel"><p><strong>${customerCount} change(s) need the customer's agreement.</strong> Send them to ${esc(firstName)} to confirm or dispute on their own screen, or record their answer below.</p>
-          <div class="panel-actions"><button class="btn-primary" id="send-customer">Send to the customer to confirm</button></div></div>` : ""}
-        ${open.map(findingHtml).join("") || '<div class="panel">Nothing left to decide.</div>'}
+      ${c.transactions.length ? `<div class="section"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
+        <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
+        ${bankingHtml(c)}</div>` : ""}
+
+      <div class="section"><h2>To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
+        ${questions && !complete ? `<p class="section-note">${questions} of these need${questions === 1 ? "s" : ""} the customer's agreement: press <strong>Send to the customer</strong> above for ${esc(firstName)} to confirm or dispute on their own screen, or record their answer below.</p>` : ""}
+        ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
         ${decided.length ? `<details class="payments-detail"><summary>Decided (${decided.length})</summary>
-          ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept the entered figure"} · ${esc(f.decision.by)}</div>
+          ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered"} · ${esc(f.decision.by)}</div>
             <div class="small">${esc(f.message)}${f.decision.reason ? `<br><em>“${esc(f.decision.reason)}”</em>` : ""}</div></div>`).join("")}</details>` : ""}
         ${matches.length ? `<details class="payments-detail"><summary>Confirmed by a source (${matches.length})</summary>
           ${matches.map((f) => `<div class="row"><span class="label">${esc(SOURCE[f.source] || f.source)}</span><span class="value" style="font-weight:400">${esc(f.message)}</span></div>`).join("")}</details>` : ""}
+        <div class="inline-form">
+          <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Approve fact find</button>
+          <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
+        </div>
       </div>
 
-      ${c.transactions.length ? `<div class="section"><h2>Open Banking aggregate<span class="count">one file per person or company</span></h2>
-        <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
-        ${aggregateHtml(c)}</div>
-
-      <div class="section"><h2>Bank transactions<span class="count">${c.transactions.length} placed on budget lines</span></h2>
+      ${c.transactions.length ? `<div class="section"><h2>Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
         <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which.</p>
         ${toCategorise}
-        <details class="payments-detail"><summary>All transactions — and how each was placed</summary>
-          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th></tr></thead>
+        <details class="payments-detail"><summary>All categorised transactions (${c.transactions.length}) – how each was placed</summary>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th><th></th></tr></thead>
           <tbody>${txRows}</tbody></table></div></details></div>` : ""}
 
-      <div class="section"><h2>Fact find</h2>${people}</div>
-      ${company}
-      <div class="section"><h2>Commitments</h2>
-        ${commitments ? `<div class="table-wrap"><table><thead><tr><th>Whose</th><th>Lender</th><th>Type</th><th class="num">Balance</th><th class="num">Monthly</th><th>Status</th></tr></thead><tbody>${commitments}</tbody></table></div>` : '<p class="small">None.</p>'}
-      </div>
-      <div class="section"><h2>Budget planner <span class="count">C2C Mortgage Expenditure Form</span></h2>${planner}</div>
-      <div class="section"><h2>Summary</h2>
-        ${rowHtml("Total committed", gbp(s.total_committed))}
-        ${rowHtml("Total basic essential", gbp(s.total_essential))}
-        ${rowHtml("Total basic quality of living", gbp(s.total_quality))}
-        ${rowHtml("Total outgoings", `<strong>${gbp(s.monthly_expenditure)}</strong>`)}
-        ${rowHtml("Household gross income (annual)", gbp(s.gross_annual_income))}
-        ${rowHtml("Net monthly income", gbp(s.net_monthly_income))}
-        ${rowHtml("Disposable income (monthly, net pay less outgoings other than tax)", `<strong>${gbp(s.disposable_monthly)}</strong>`)}
-      </div>
+      <div class="section"><h2>Fact find and budget planner<span class="count">C2C Mortgage Expenditure Form</span></h2>${factfindSections(c)}</div>
 
       <div class="section"><h2>Outputs</h2>
-        <div class="panel"><p>The C2C Mortgage Expenditure Form filled from this fact find, a one-page case report, and the C2C Data Pack itself.</p>
-          <div class="panel-actions">
-            <button class="btn-primary" id="dl-standard">Expenditure form (Excel)</button>
-            <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
-            <button class="btn-secondary" id="dl-pack">C2C Data Pack (JSON)</button>
-          </div>
-          <div class="panel-actions">
-            <button class="btn-secondary" id="approve-btn" ${blocking(c) || c.status === "APPROVED" ? "disabled" : ""}>${c.status === "APPROVED" ? "Approved" : "Approve fact find"}</button>
-          </div>
-          <p class="note">${blocking(c) ? `Approve is available once the ${blocking(c)} difference(s) above have a decision.` : ""}</p></div>
+        <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
+          <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option>
+            ${D.templates.map((t) => { const ready = state.templates[t.id] && state.templates[t.id].saved;
+              return `<option value="${esc(t.id)}" ${ready ? "" : "disabled"}>${esc(t.name)} (${t.kind === "PDF" ? "Fillable PDF" : "Excel"})${ready ? "" : " – mapping not saved"}</option>`; }).join("")}</select>
+            <button class="btn-primary" id="out-create">Create</button></div>
+          ${outputs ? `<div class="table-wrap" style="margin-top:12px"><table><tbody>${outputs}</tbody></table></div>` : ""}</div>
       </div>
 
       <div class="section"><h2>Audit trail</h2>
-        ${audit ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>What</th><th class="num">Was</th><th class="num">Now</th><th>From</th></tr></thead><tbody>${audit}</tbody></table></div>`
+        ${audit ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Field</th><th class="num">Was</th><th class="num">Now</th><th>From</th></tr></thead><tbody>${audit}</tbody></table></div>`
                 : '<p class="small">No changes yet. Accepting a figure or categorising a transaction records it here.</p>'}
       </div>
       <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real affordability assessment.</p>`;
     banner = "";
 
     $("case-back").addEventListener("click", () => showView("portal"));
-    if ($("send-customer")) $("send-customer").addEventListener("click", () => renderCustomer(c));
+    if ($("send-customer")) $("send-customer").addEventListener("click", () => newLink(c));
+    if ($("copy-link")) $("copy-link").addEventListener("click", (e) => {
+      const input = $("cust-link"); input.select();
+      if (navigator.clipboard) navigator.clipboard.writeText(input.value);
+      e.target.textContent = "Copied";
+    });
+    if ($("open-link")) $("open-link").addEventListener("click", () => { freshLink = null; location.hash = "answer/" + c.link.token; });
+    freshLink = null;
     document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
       E.accept(c, b.dataset.accept, WHO, D.lines); save(); renderCase();
     }));
@@ -1009,72 +1070,146 @@
       const remember = document.querySelector(`[data-remember-for="${CSS.escape(id)}"]`).checked;
       E.recategorise(state.cases, c, id, cat, remember, WHO, D); save(); renderCase();
     }));
-    $("dl-standard").addEventListener("click", () => downloadStandard(c));
-    $("dl-report").addEventListener("click", () => downloadReport(c));
+    document.querySelectorAll("[data-change]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.dataset.change;
+      const cat = document.querySelector(`[data-row-cat="${CSS.escape(id)}"]`).value;
+      const remember = document.querySelector(`[data-row-remember="${CSS.escape(id)}"]`).checked;
+      if (cat === "TRANSFER") { alert("Transfers are found by pairing both sides; choose what the money was for."); return; }
+      E.recategorise(state.cases, c, id, cat, remember, WHO, D); save(); renderCase();
+    }));
+    $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
     $("dl-pack").addEventListener("click", () =>
       download(new Blob([JSON.stringify(E.dataPack(c, D.lines), null, 2)], { type: "application/json" }),
                `${c.reference} C2C Data Pack.json`));
+    $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
+    document.querySelectorAll("[data-output]").forEach((b) => b.addEventListener("click", () => {
+      const o = c.outputs[+b.dataset.output];
+      makeOutput(c, o.kind, null, true);
+    }));
     $("approve-btn").addEventListener("click", () => {
-      c.status = "APPROVED";
-      c.factfind.audit.push({ at: new Date().toISOString(), by: WHO, path: "fact find", old: null,
+      c.status = "COMPLETE"; c.completed_at = new Date().toISOString();
+      c.factfind.audit.push({ at: c.completed_at, by: WHO, path: "fact find", old: null,
                               new: "approved", origin: "BROKER", status: "APPROVED", reason: "" });
       save(); renderCase();
     });
   }
 
   // ---- the customer's screen -----------------------------------------------------------------
-  // In a joint case both applicants see the screen, so each item says whose
-  // figure it is; household spending belongs to both.
-  function customerHeading(c, f) {
-    const people = c.factfind.data.applicants;
-    const i = people.findIndex((a) => a.key === f.party);
-    const whose = people.length > 1 && i >= 0 ? `${people[i].first_name}'s` : "Your";
-    if (/income/.test(f.path)) return `${whose} income`;
-    if (/commitments/.test(f.path)) return `${whose} credit commitments`;
-    if (/expenditure/.test(f.path)) return people.length > 1 ? "Your household's monthly spending" : "Your monthly spending";
-    if (/date_of_birth/.test(f.path)) return `${whose} details`;
-    return "Your figures";
+  // What the customer is asked, in their words: the same wording as the
+  // service's customer page (cases/customer.py).
+  const CUSTOMER_SOURCE = { CREDIT_FILE: "your credit report", OPEN_BANKING: "your bank statements",
+                            COMPANY_REPORT: "the company report", HMRC_PAYROLL: "HMRC", HMRC_SA: "HMRC" };
+  const FIELD = {}; D.fields.forEach((f) => { FIELD[f.path] = f; });
+  const money = (v) => (v === null || v === undefined || v === "") ? "" : "£" + E.fmt(v);
+  const capitalise = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  function question(c, f) {
+    const data = c.factfind.data, people = data.applicants;
+    let title, said, ask;
+    if (f.action === "ADD_COMMITMENT") {
+      const row = (f.extra || {}).row || {};
+      title = `${row.lender || "A lender"} ${String(row.type || "").replace(/_/g, " ").toLowerCase()}`.trim();
+      said = "Not on the form you gave us";
+      ask = `Should we add it, at ${money(f.proposed)} a month?`;
+    } else if (f.path.startsWith("commitments[")) {
+      const row = E.getPath(data, f.path.slice(0, f.path.lastIndexOf(".")), {}) || {};
+      title = `Your ${row.lender || ""} ${String(row.type || "").replace(/_/g, " ").toLowerCase()} payment`.replace("  ", " ");
+      said = `You told us ${money(f.declared)} a month`;
+      ask = `Should we use ${money(f.proposed)} a month instead?`;
+    } else {
+      const field = FIELD[f.path.replace(/\[\d+\]/g, "[n]")];
+      title = field ? field.label : capitalise(f.path.slice(f.path.lastIndexOf(".") + 1).replace(/_/g, " "));
+      const m = /^applicants\[(\d+)\]/.exec(f.path);
+      if (m && people[+m[1]]) title = `${people[+m[1]].first_name}'s ${title.charAt(0).toLowerCase()}${title.slice(1)}`;
+      said = `You told us ${money(f.declared)}`;
+      ask = `Should we use ${money(f.proposed)} instead?`;
+    }
+    const source = CUSTOMER_SOURCE[f.source] || "the report";
+    const shows = `${capitalise(source)} ${source.endsWith("statements") ? "show" : "shows"} ${money(f.evidence)}`;
+    return { id: f.id, title: title, said: said, shows: shows, ask: ask };
   }
+
   function renderCustomer(c) {
-    const items = forCustomer(c);
-    const people = c.factfind.data.applicants;
-    const who = people.map((a) => a.full_name).join(" & ") || "Customer";
-    const first = people.map((a) => a.first_name).join(" and ");
     showView("customer");
-    $("customer-view").innerHTML = `
-      <div class="demo-control"><div class="demo-control-label">Demo control &mdash; not part of the product</div>
-        <p class="small" style="margin:0">In the live service the hub sends ${esc(first)} a link by email or text, opened without signing in and good for 14 days. This is the screen they see; each answer goes on the case as a decision made by the customer.</p></div>
-      <div class="eyebrow">ABC Ltd · your mortgage application</div>
-      <h1 class="title">Please check these figures, ${esc(first)}</h1>
-      <p class="subtitle">We compared what you told us with your bank and your credit report. Where they differ, please tell us which is right. Nothing changes without your answer.</p>
-      ${items.map((f) => `<div class="item">
-        <h3>${esc(customerHeading(c, f))}</h3>
-        <div class="finding-text">${esc(f.message)}</div>
-        ${figuresHtml(f)}
+    const view = $("customer-view"), l = c.link;
+    const names = c.factfind.data.applicants.map((a) => a.full_name).filter(Boolean);
+    const back = `<div class="demo-control"><div class="demo-control-label">Demo control &mdash; not part of the product</div>
+        <p class="small" style="margin:0 0 10px">This is the customer's own page, opened from the link without signing in. Each answer goes on the case as a decision made by the customer.</p>
+        <button class="btn-secondary" id="cust-back" style="width:auto">Back to the broker view</button></div>`;
+    if (l.answered_at) {
+      view.innerHTML = `${back}<div class="panel" style="text-align:center;padding:32px 18px">
+        <div style="font-size:34px;color:var(--teal)">✓</div><h1 class="title">Thank you</h1>
+        <p class="subtitle" style="margin:0 auto">Your answers have gone to your adviser at ${esc(D.firm)}. You can close this page.</p></div>`;
+      $("cust-back").addEventListener("click", () => openCase(c));
+      return;
+    }
+    const items = forCustomer(c).map((f) => question(c, f));
+    view.innerHTML = `${back}
+      <h1 class="title">Please check these figures</h1>
+      <p class="subtitle">Your adviser at ${esc(D.firm)} compared what you told them with your bank statements and credit report. Where they differ, tell us which is right. Nothing changes without your answer.</p>
+      <div id="cust-error" class="banner hidden" style="border-color:rgba(230,23,88,0.4);background:rgba(230,23,88,0.06);color:var(--brand-ink)"></div>
+      <div class="item"><label for="cust-name"><strong>Who is answering?</strong></label>
+        <div class="inline-form" style="margin-top:8px"><select id="cust-name">${names.map((n) => `<option>${esc(n)}</option>`).join("")}</select></div></div>
+      ${items.map((q) => `<div class="item">
+        <h3>${esc(q.title)}</h3>
+        <div class="figures"><div class="fig-value" style="font-size:14px">${esc(q.said)}</div><div class="fig-value" style="font-size:14px">${esc(q.shows)}</div></div>
+        <div class="finding-text">${esc(q.ask)}</div>
         <div class="choice">
-          <label><input type="radio" name="ans-${esc(f.id)}" value="yes" checked /> Yes, use the ${esc(SOURCE[f.source] || "source")} figure</label>
-          <label><input type="radio" name="ans-${esc(f.id)}" value="no" /> No, my figure is right</label>
+          <label><input type="radio" name="ans-${esc(q.id)}" value="yes" /> Yes, use that</label>
+          <label><input type="radio" name="ans-${esc(q.id)}" value="no" /> No, mine is right</label>
         </div>
-        <div class="inline-form" style="margin-top:8px"><input type="text" placeholder="If not, tell us why (optional)" data-cust-reason="${esc(f.id)}" /></div>
-      </div>`).join("") || '<div class="panel">Nothing to confirm.</div>'}
-      <div class="actions">
-        <button class="btn-primary" id="cust-send">Send my answers</button>
-        <button class="btn-secondary" id="cust-back">Back to the broker view</button>
-      </div>`;
+        <div class="inline-form" style="margin-top:8px"><input type="text" maxlength="300" placeholder="If not, why? (optional)" data-cust-reason="${esc(q.id)}" /></div>
+      </div>`).join("") || '<div class="panel">Nothing needs your answer. Thank you.</div>'}
+      ${items.length ? '<div class="actions"><button class="btn-primary" id="cust-send">Send my answers</button></div>' : ""}`;
     $("cust-back").addEventListener("click", () => openCase(c));
+    if (!items.length) return;
     $("cust-send").addEventListener("click", () => {
-      let yes = 0, no = 0;
-      items.forEach((f) => {
-        const agrees = document.querySelector(`input[name="ans-${CSS.escape(f.id)}"]:checked`).value === "yes";
-        const reason = document.querySelector(`[data-cust-reason="${CSS.escape(f.id)}"]`).value.trim();
-        E.customerAnswer(c, f.id, agrees, who, reason || "The customer says their own figure is right", D.lines);
-        agrees ? yes++ : no++;
+      const answers = items.map((q) => {
+        const picked = document.querySelector(`input[name="ans-${CSS.escape(q.id)}"]:checked`);
+        return { id: q.id, picked: picked && picked.value,
+                 reason: document.querySelector(`[data-cust-reason="${CSS.escape(q.id)}"]`).value.trim() };
       });
-      save();
-      banner = `${who} answered: ${yes} accepted, ${no} disputed. Their answers are on the audit trail.`;
-      openCase(c);
+      if (answers.some((a) => !a.picked)) {
+        $("cust-error").textContent = "Please answer every question."; $("cust-error").classList.remove("hidden");
+        window.scrollTo(0, 0); return;
+      }
+      const name = $("cust-name").value;
+      let yes = 0, no = 0;
+      answers.forEach((a) => {
+        // Accepting one change can settle another; that one is no longer asked.
+        if (!forCustomer(c).some((f) => f.id === a.id)) return;
+        E.customerAnswer(c, a.id, a.picked === "yes", name, a.reason || "The customer says their figure is right", D.lines);
+        a.picked === "yes" ? yes++ : no++;
+      });
+      l.answered_at = new Date().toISOString();
+      banner = `${name} answered: ${yes} accepted, ${no} kept as entered. Their answers are on the audit trail.`;
+      save(); renderCustomer(c);
     });
   }
+
+  // A customer link opened in this browser: #answer/<token>.
+  function route() {
+    const m = /^#answer\/([0-9a-f]+)$/.exec(location.hash);
+    if (!m) return false;
+    const c = state.cases.find((x) => x.link && x.link.token === m[1]);
+    if (!c || new Date(c.link.expires) < new Date()) {
+      showView("customer");
+      $("customer-view").innerHTML = `<h1 class="title">Not found</h1><p class="subtitle">This link has expired or been replaced. Ask your adviser for a new one.</p>
+        <div class="actions"><button class="btn-secondary" id="cust-home">Back to the broker view</button></div>`;
+      $("cust-home").addEventListener("click", () => { history.replaceState(null, "", location.pathname + location.search); showView("portal"); });
+      return true;
+    }
+    renderCustomer(c);
+    return true;
+  }
+  window.addEventListener("hashchange", route);
+  // Answers given in another tab of this browser.
+  window.addEventListener("storage", (e) => {
+    if (e.key !== KEY) return;
+    state = load();
+    if (currentCase) currentCase = state.cases.find((x) => x.id === currentCase.id) || null;
+    if (!$("case-view").classList.contains("hidden") && currentCase) renderCase();
+    else if (!$("portal-view").classList.contains("hidden")) renderPortal();
+  });
 
   // ---- Excel and PDF ----------------------------------------------------------------------------
   // ExcelJS drops links between tabs when it reads a workbook; the form's
@@ -1085,12 +1220,18 @@
                        "Credit Card Dets!A14": "Expenditure!A1", "Personal or Student Loan Dets!A18": "Expenditure!A1",
                        "Car Loan Dets!A13": "Expenditure!A1" };
   async function withButton(id, busy, fn) {
-    const btn = $(id), label = btn.textContent; btn.disabled = true; btn.textContent = busy;
+    const btn = id && $(id), text = btn && btn.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = busy; }
     try { await fn(); } catch (e) { alert("Something went wrong: " + e.message); }
-    btn.disabled = false; btn.textContent = label;
+    if (btn) { btn.disabled = false; btn.textContent = text; }
   }
-  function downloadStandard(c) {
-    return withButton("dl-standard", "Filling the form…", async () => {
+  // Made from the case screen, a file is listed under Outputs; the list
+  // makes it again from the case as it stands.
+  function made(c, kind, filename, button) {
+    if (button && button !== "fill-template") { recordOutput(c, kind, filename); renderCase(); }
+  }
+  function downloadStandard(c, button) {
+    return withButton(button, "Filling the form…", async () => {
       const rendered = E.render(D.standard_mapping, c.factfind.data, D.lines);
       const wb = await E.fillWorkbook(window.ExcelJS, await fetchBuffer("expenditure_form.xlsx"), rendered);
       Object.entries(FORM_LINKS).forEach(([at, to]) => {
@@ -1099,11 +1240,12 @@
       });
       E.addC2CSheets(wb, c);
       download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} C2C expenditure form.xlsx`);
+      made(c, "standard", `${c.reference} C2C expenditure form.xlsx`, button);
     });
   }
 
-  function downloadReport(c) {
-    return withButton("dl-report", "Writing the report…", async () => {
+  function downloadReport(c, button) {
+    return withButton(button, "Writing the report…", async () => {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
@@ -1137,7 +1279,10 @@
       table("At a glance", ["Measure", "Value"], [
         ["Disposable income a month", gbp(g.disposable)], ["Outgoings a month", gbp(g.outgoings)],
         ["Net monthly income", gbp(s.net_monthly_income)], ["Household gross income a year", gbp(s.gross_annual_income)],
-        ["Figures backed by a source", `${g.backed} of ${g.total}`], ["Differences still open", String(g.differences)]]);
+        ["Figures backed by a report", `${g.backed} of ${g.total}`], ["Differences still open", String(g.differences)]]);
+      const ch = E.changes(c);
+      if (ch.length) table("What changed", ["What", "Customer entered", "Now", "From", "By"], ch.map((x) => [
+        x.label || fieldLabel(x.path, c), x.was === null ? "–" : gbp(x.was), gbp(x.now), SOURCE[x.origin] || x.origin, x.by]));
       const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
       if (decided.length) table("Decisions", ["Decision", "By", "Finding"], decided.map((f) => [
         f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered" + (f.decision.reason ? ` — “${f.decision.reason}”` : ""),
@@ -1149,6 +1294,7 @@
       const commitments = c.factfind.data.commitments.filter(Boolean);
       if (commitments.length) table("Commitments", ["Whose", "Lender", "Balance", "Monthly"],
         commitments.map((r) => [r.owner_name || r.owner, r.lender, gbp(r.balance), gbp(r.monthly_payment)]));
+      table("Sources", ["Person", "Reports"], c.parties.map((p) => [p.name, p.sources.map((x) => SOURCE[x] || x).join(", ")]));
       if (c.factfind.audit.length) table("Audit trail", ["When", "Who", "What", "Was", "Now"],
         c.factfind.audit.map((e) => [String(e.at).slice(0, 16).replace("T", " "), e.by,
           /^(applicants|expenditure|commitments|company)/.test(e.path) ? fieldLabel(e.path, c) : e.path,
@@ -1156,6 +1302,7 @@
       doc.setFontSize(8); doc.setTextColor(120);
       doc.text("DEMO document generated from fictional test data. Not a real affordability assessment.", 40, H - 24);
       doc.save(`${c.reference} case report.pdf`);
+      made(c, "report", `${c.reference} case report.pdf`, button);
     });
   }
 
@@ -1250,11 +1397,11 @@
               `<option value="${p}" ${p === col.path ? "selected" : ""}>${p.replace(/_/g, " ")}</option>`).join("")}</select></td></tr>`).join("")}</table></div>`).join("")}</div>` : ""}
       <div class="actions"><button class="btn-primary" id="save-mapping">Save mapping</button>
         <button class="btn-secondary" id="start-over">Start over</button></div>
-      ${st.saved ? `<div class="section" style="margin-top:28px"><h2>Fill it for a case</h2>
+      ${st.saved ? `<div class="section" style="margin-top:28px"><h2>Try it on a case</h2>
         <div class="inline-form"><select id="fill-case">${state.cases.filter((c) => c.status !== "COLLECTING").map((c) =>
           `<option value="${state.cases.indexOf(c)}">${esc(caseTitle(c))} · ${esc(c.reference)}</option>`).join("")}</select>
           <button class="btn-primary" id="fill-template">Fill and download</button></div>
-        <p class="section-note" style="margin-top:10px">Uses the case as it stands now, including any figures accepted on the case screen.</p></div>` : ""}`;
+        <p class="section-note" style="margin-top:10px">Uses the case as it stands now, including any figures accepted on the case screen. Once saved, it is also under Outputs on every case.</p></div>` : ""}`;
 
     $("tpl-back").addEventListener("click", () => { currentTemplate = null; renderTemplates(); });
     if ($("ask-ai")) $("ask-ai").addEventListener("click", () => {
@@ -1294,8 +1441,9 @@
     };
   }
 
-  function fillTemplate(t, st, c) {
-    return withButton("fill-template", "Filling…", async () => {
+  function fillTemplate(t, st, c, button) {
+    button = button || "fill-template";
+    return withButton(button, "Filling…", async () => {
       const rendered = E.render(mappingFor(st), c.factfind.data, D.lines);
       const buffer = await fetchBuffer(t.file);
       if (t.kind === "PDF") {
@@ -1305,14 +1453,16 @@
           try { form.getTextField(target).setText(String(E.formatValue(value, format, false))); } catch (e) { /* not a text field */ }
         });
         download(new Blob([await pdf.save()], { type: "application/pdf" }), `${c.reference} ${t.name}.pdf`);
+        made(c, t.id, `${c.reference} ${t.name}.pdf`, button);
       } else {
         const wb = await E.fillWorkbook(window.ExcelJS, buffer, rendered);
         download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} ${t.name}.xlsx`);
+        made(c, t.id, `${c.reference} ${t.name}.xlsx`, button);
       }
     });
   }
 
-  showView("portal");
+  if (!route()) showView("portal");
 })();
 </script>
 </body>
