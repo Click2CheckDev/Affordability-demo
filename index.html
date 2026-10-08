@@ -873,7 +873,8 @@
     Object.entries(c.accounts).forEach(([party, acc]) => acc.accounts.forEach((a) => {
       const b = E.breakdown(c, party, a.id);
       accounts.push({ party: party, token: "acct:" + a.id, cats: new Set(b.income.concat(b.expenditure).map((r) => r.category)),
-                      moneyIn: b.moneyIn.average > 0 });
+                      // Pay belongs to the account it is paid into, not to one that only earns interest.
+                      pay: b.income.some((r) => ["SALARY", "BENEFITS", "PENSION_INCOME"].includes(r.category)) });
     }));
     return accounts;
   }
@@ -888,7 +889,7 @@
       if (path.startsWith("expenditure.")) {
         const line = path.split(".")[1].toUpperCase();
         idx.filter((a) => !company.has(a.party) && a.cats.has(line)).forEach((a) => t.push(a.token));
-      } else if (person) idx.filter((a) => a.party === person && a.moneyIn).forEach((a) => t.push(a.token));
+      } else if (person) idx.filter((a) => a.party === person && a.pay).forEach((a) => t.push(a.token));
       else if (path.startsWith("company.")) idx.filter((a) => company.has(a.party)).forEach((a) => t.push(a.token));
     }
     if (credit) {
