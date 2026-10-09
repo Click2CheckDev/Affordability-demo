@@ -612,7 +612,7 @@
   // ---- state ----------------------------------------------------------------------
   let state;
   function fresh() {
-    return { cases: [E.makeCase(D.cases[0]), E.makeCase(D.cases[1])], templates: {}, next: 2 };
+    return { cases: D.cases.map((def) => E.makeCase(def)), templates: {} };
   }
   function load() {
     try {
