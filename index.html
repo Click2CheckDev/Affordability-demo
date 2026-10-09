@@ -376,7 +376,10 @@
   .filter-row label { color: var(--muted); }
   .filter-row select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 3px; border: 1px solid var(--border-strong); background: var(--surface); }
 /* ---- Affordability demo additions ---- */
-  .portal-card { max-width: 980px; }
+  .portal-card { max-width: none; width: 100%; padding: 28px 28px; }
+  .case-table th, .case-table td { padding-left: 8px; padding-right: 8px; }
+  .case-table td:first-child { min-width: 220px; }
+  .case-table td { vertical-align: top; }
   .card.wide { max-width: 980px; }
   .stat-row.four { grid-template-columns: repeat(4, 1fr); }
   .stat-box .stat-sub { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
@@ -528,14 +531,16 @@
       <div class="stat-box"><div class="stat-value" id="stat-types"></div><div class="stat-label">Residential · commercial</div></div>
     </div>
     <div class="inline-form" style="margin:0 0 12px">
+      <select id="case-adviser"><option value="">Every adviser</option></select>
       <input type="text" id="case-search" placeholder="Search by name, reference or adviser" />
       <select id="case-state"><option value="">Any status</option><option value="REVIEW">Broker review</option><option value="COMPLETE">Complete</option></select>
       <select id="case-type"><option value="">Residential and commercial</option><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select>
       <span class="small muted" id="case-count"></span>
     </div>
+    <p class="small muted" style="margin:0 0 8px">Income, outgoings and disposable income are a month, for the whole household.</p>
     <div class="table-wrap">
     <table class="case-table">
-      <thead><tr><th>Case</th><th>Status</th><th class="num">Income a month</th><th class="num">Outgoings a month</th><th class="num">Disposable a month</th><th>Sources</th><th>Notes</th><th>Opened</th></tr></thead>
+      <thead><tr><th>Case</th><th>Status</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th><th>Sources</th><th>Notes</th><th>Opened</th></tr></thead>
       <tbody id="case-list"></tbody>
     </table>
     </div>
@@ -696,33 +701,43 @@
       const credit = c.pack.parties.filter((p) => p.credit).length;
       const notes = openFindings(c).filter((f) => f.outcome !== "DIFFERENCE").length, diffs = blocking(c);
       const search = [caseTitle(c), c.reference, c.adviser].concat(people).join(" ").toLowerCase();
-      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}">
+      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-adviser="${esc(c.adviser)}">
         <td><strong>${esc(caseTitle(c))}</strong><br><span class="small muted"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span>
           ${esc(c.reference)} · ${esc(c.adviser)}${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}</span></td>
         <td>${statusPill(c)}</td>
         <td class="num">${gbp(s.net_monthly_income)}</td>
         <td class="num">${gbp(s.monthly_expenditure)}</td>
         <td class="num"><strong>${gbp(s.disposable_monthly)}</strong></td>
-        <td class="small muted">${accounts} account${accounts === 1 ? "" : "s"} · ${credit} credit report${credit === 1 ? "" : "s"}</td>
+        <td class="small muted" style="white-space:nowrap">${accounts} account${accounts === 1 ? "" : "s"}<br>${credit} credit report${credit === 1 ? "" : "s"}</td>
         <td>${diffs ? pill("difference", `${diffs} TO DECIDE`) + " " : ""}${notes ? `<span class="small muted">${notes} note${notes === 1 ? "" : "s"}</span>` : diffs ? "" : '<span class="muted">—</span>'}</td>
-        <td>${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</td>
+        <td style="white-space:nowrap">${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</td>
       </tr>`;
     }).join("");
     document.querySelectorAll("#case-list tr").forEach((tr) =>
       tr.addEventListener("click", () => openCase(state.cases[+tr.dataset.i])));
+    const sel = $("case-adviser"), kept = sel.value;
+    sel.innerHTML = '<option value="">Every adviser</option>' + [...new Set(state.cases.map((c) => c.adviser))].sort()
+      .map((a) => `<option value="${esc(a)}"${a === kept ? " selected" : ""}>${esc(a)}</option>`).join("");
     filterCases();
   }
   function filterCases() {
     const words = $("case-search").value.toLowerCase().split(/\s+/).filter(Boolean);
-    const st = $("case-state").value, ty = $("case-type").value;
-    const rows = document.querySelectorAll("#case-list tr"); let shown = 0;
+    const st = $("case-state").value, ty = $("case-type").value, ad = $("case-adviser").value;
+    const rows = [...document.querySelectorAll("#case-list tr")]; let shown = 0;
+    // The adviser filter is an adviser's own view: the counts follow it.
+    const mine = rows.filter((r) => !ad || r.dataset.adviser === ad);
     rows.forEach((r) => {
-      const on = words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty);
+      const on = mine.includes(r) && words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty);
       r.style.display = on ? "" : "none"; if (on) shown++;
     });
-    $("case-count").textContent = words.length || st || ty ? `${shown} of ${rows.length}` : "";
+    const n = (key, value) => mine.filter((r) => r.dataset[key] === value).length;
+    $("stat-total").textContent = mine.length;
+    $("stat-review").textContent = n("state", "REVIEW");
+    $("stat-complete").textContent = n("state", "COMPLETE");
+    $("stat-types").textContent = `${n("type", "RESIDENTIAL")} · ${n("type", "COMMERCIAL")}`;
+    $("case-count").textContent = words.length || st || ty || ad ? `${shown} of ${rows.length}` : "";
   }
-  ["case-search", "case-state", "case-type"].forEach((id) => {
+  ["case-search", "case-state", "case-type", "case-adviser"].forEach((id) => {
     $(id).addEventListener("input", filterCases); $(id).addEventListener("change", filterCases);
   });
 
