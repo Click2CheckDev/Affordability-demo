@@ -500,7 +500,7 @@
     <option value="templates">Templates</option><option value="how">How it works</option>
   </select>
   <div class="welcome">
-    Welcome, ABC Ltd
+    <span id="welcome-name">Welcome</span>
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1.5-4 5-6 7.5-6s6 2 7.5 6"/></svg>
   </div>
 </div>
@@ -536,7 +536,7 @@
     <div class="portal-header">
       <div>
         <div class="eyebrow muted">Affordability · ABC Ltd</div>
-        <h1 class="title" style="font-size:26px;">Cases</h1>
+        <h1 class="title" style="font-size:26px;">Your cases</h1>
         <p class="subtitle">Every case the C2C hub has opened for this firm. A case arrives once the customer has consented and their credit report and Open Banking are in, already built from them: the household's income and outgoings added up across every account.</p>
       </div>
     </div>
@@ -547,7 +547,6 @@
       <div class="stat-box"><div class="stat-value" id="stat-types"></div><div class="stat-label">Residential · commercial</div></div>
     </div>
     <div class="inline-form" style="margin:0 0 12px">
-      <select id="case-adviser"><option value="">Every adviser</option></select>
       <input type="text" id="case-search" placeholder="Search by name or reference" />
       <select id="case-attention"><option value="">Every case</option><option value="yes">Needs attention</option><option value="no">All clear</option></select>
       <select id="case-state"><option value="">Any status</option><option value="REVIEW">Broker review</option><option value="COMPLETE">Complete</option></select>
@@ -557,7 +556,7 @@
     <p class="small muted" style="margin:0 0 8px">Income, outgoings and disposable income are a month, for the whole household.</p>
     <div class="table-wrap">
     <table class="case-table">
-      <thead><tr><th>Case</th><th>Adviser</th><th>Status · needs attention</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th></tr></thead>
+      <thead><tr><th>Case</th><th>Status · needs attention</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th></tr></thead>
       <tbody id="case-list"></tbody>
     </table>
     </div>
@@ -605,7 +604,9 @@
 (function () {
   "use strict";
   const D = window.DEMO, E = window.Engine, AI = window.SIMULATED_AI || {};
-  const WHO = "Demo adviser";
+  // One adviser's view: theirs are the cases, and the decisions.
+  const WHO = D.adviser || "Demo adviser";
+  document.getElementById("welcome-name").textContent = `Welcome, ${WHO}`;
   const KEY = "c2c-affordability-demo-v3";
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s === null || s === undefined ? "" : s)
@@ -718,11 +719,10 @@
       const credit = c.pack.parties.filter((p) => p.credit).length;
       const attention = flagsFor(c).filter((f) => f.level !== "OK");
       const search = [caseTitle(c), c.reference].concat(people).join(" ").toLowerCase();
-      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-adviser="${esc(c.adviser)}" data-attention="${attention.length ? "yes" : ""}">
+      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-attention="${attention.length ? "yes" : ""}">
         <td><strong>${esc(caseTitle(c))}</strong><br><span class="small muted"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span>
           <span style="white-space:nowrap">${esc(c.reference)}</span>${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}
-          <br>${accounts} account${accounts === 1 ? "" : "s"} · ${credit} credit report${credit === 1 ? "" : "s"}</span></td>
-        <td>${esc(c.adviser)}<br><span class="small muted" style="white-space:nowrap">opened ${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</span></td>
+          <br>${accounts} account${accounts === 1 ? "" : "s"} · ${credit} credit report${credit === 1 ? "" : "s"} · opened ${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</span></td>
         <td style="min-width:220px">${statusPill(c)}<div style="margin-top:4px">${attention.slice(0, 3).map((f) => `<div class="small" style="margin:2px 0;color:var(--ink)">${flagPill(f.level)} ${esc(f.title)}</div>`).join("") || flagPill("OK").replace(">OK<", ">All clear<")}${attention.length > 3 ? `<div class="small muted">and ${attention.length - 3} more</div>` : ""}</div></td>
         <td class="num">${gbp(s.net_monthly_income)}</td>
         <td class="num">${gbp(s.monthly_expenditure)}</td>
@@ -731,30 +731,20 @@
     }).join("");
     document.querySelectorAll("#case-list tr").forEach((tr) =>
       tr.addEventListener("click", () => openCase(state.cases[+tr.dataset.i])));
-    const sel = $("case-adviser"), kept = sel.value;
-    sel.innerHTML = '<option value="">Every adviser</option>' + [...new Set(state.cases.map((c) => c.adviser))].sort()
-      .map((a) => `<option value="${esc(a)}"${a === kept ? " selected" : ""}>${esc(a)}</option>`).join("");
     filterCases();
   }
   function filterCases() {
     const words = $("case-search").value.toLowerCase().split(/\s+/).filter(Boolean);
-    const st = $("case-state").value, ty = $("case-type").value, ad = $("case-adviser").value, at = $("case-attention").value;
+    const st = $("case-state").value, ty = $("case-type").value, at = $("case-attention").value;
     const rows = [...document.querySelectorAll("#case-list tr")]; let shown = 0;
-    // The adviser filter is an adviser's own view: the counts follow it.
-    const mine = rows.filter((r) => !ad || r.dataset.adviser === ad);
     rows.forEach((r) => {
-      const on = mine.includes(r) && words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty)
+      const on = words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty)
         && (!at || (at === "yes") === !!r.dataset.attention);
       r.style.display = on ? "" : "none"; if (on) shown++;
     });
-    const n = (key, value) => mine.filter((r) => r.dataset[key] === value).length;
-    $("stat-total").textContent = mine.length;
-    $("stat-review").textContent = n("state", "REVIEW");
-    $("stat-complete").textContent = n("state", "COMPLETE");
-    $("stat-types").textContent = `${n("type", "RESIDENTIAL")} · ${n("type", "COMMERCIAL")}`;
-    $("case-count").textContent = words.length || st || ty || ad || at ? `${shown} of ${rows.length}` : "";
+    $("case-count").textContent = words.length || st || ty || at ? `${shown} of ${rows.length}` : "";
   }
-  ["case-search", "case-state", "case-type", "case-adviser", "case-attention"].forEach((id) => {
+  ["case-search", "case-state", "case-type", "case-attention"].forEach((id) => {
     $(id).addEventListener("input", filterCases); $(id).addEventListener("change", filterCases);
   });
 
