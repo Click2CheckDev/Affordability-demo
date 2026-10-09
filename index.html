@@ -382,7 +382,7 @@
   .case-table th, .case-table td { padding-left: 8px; padding-right: 8px; }
   .case-table td:first-child { min-width: 180px; }
   .case-table td { vertical-align: top; }
-  .card.wide { max-width: 980px; }
+  .card.wide { max-width: 1120px; }
   .stat-row.four { grid-template-columns: repeat(4, 1fr); }
   .stat-box .stat-sub { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .section h2 .count { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-left: 8px; font-weight: 400; }
@@ -418,6 +418,37 @@
                    background: var(--surface, #fff); padding: 10px 0; margin: 0 0 8px; border-bottom: 1px solid var(--border); }
   .source-picker button { width: auto; padding: 6px 12px; font-size: 12.5px; }
   .src-off { display: none !important; }
+  /* The bank report, laid out as the C2C bank report is (cases/_bank_report.html) */
+  .bank-report { border: 1px solid var(--border); border-radius: 4px; margin: 0 0 16px; padding: 0 0 14px; overflow: hidden; background: #fff; }
+  .bank-report > *:not(.band) { margin-left: 14px; margin-right: 14px; }
+  .bank-report .band { background: var(--brand); color: #fff; font-weight: 600; font-size: 15px; padding: 9px 14px; margin-bottom: 6px; }
+  .bank-report .sub-band { font-size: 13.5px; font-weight: 600; color: var(--ink); margin: 16px 14px 6px; padding-bottom: 6px; border-bottom: 2px solid var(--brand); }
+  .bank-report .sub-band .muted { font-weight: 400; }
+  .bank-report tbody tr:nth-child(even) td { background: #f6f6f7; }
+  .bank-report tr.strong td { font-weight: 600; background: #eeeef0 !important; }
+  .bank-report tr.primary-row td { font-weight: 600; }
+  .bank-report tr.sub-row td { color: var(--muted); font-size: 12.5px; }
+  .bank-report tr.sub-row td:first-child { padding-left: 24px; }
+  .chart-box { margin: 10px 14px 0; }
+  .chart { width: 100%; max-width: 760px; height: auto; display: block; }
+  .chart text { font: 11px var(--font-sans, sans-serif); fill: var(--muted); }
+  .chart .grid { stroke: #e6e6ea; stroke-width: 1; }
+  .chart .axis { stroke: var(--muted); stroke-width: 1; }
+  .chart .bar-in, .key-in { fill: var(--teal); background: var(--teal); }
+  .chart .bar-out, .key-out { fill: var(--brand); background: var(--brand); }
+  .chart .left { fill: none; stroke: var(--ink); stroke-width: 2; }
+  .chart .left-dot, .key-left { fill: var(--ink); background: var(--ink); }
+  .chart-box figcaption { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .chart-box .key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
+  .btn-verify { width: auto; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
+                background: #fff; color: var(--brand); border: 1px solid var(--brand); margin-left: 6px; }
+  .statement td { padding-top: 7px; padding-bottom: 7px; }
+  .statement tr.day td { border-top: 2px solid var(--border); }
+  .statement details summary { cursor: pointer; }
+  .statement-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
+  .statement-filters input, .statement-filters select { font: inherit; font-size: 13px; padding: 7px 9px; border-radius: 3px;
+    border: 1px solid var(--border-strong); background: #fff; color: var(--ink); }
+  .statement-filters button { width: auto; padding: 7px 14px; font-size: 13px; }
   .flag { display: inline-flex; justify-content: center; min-width: 46px; padding: 2px 8px; border-radius: 999px;
           font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; flex-shrink: 0; }
   .flag-ACT { background: rgba(230,23,88,0.12); color: var(--brand-ink); }
@@ -566,6 +597,9 @@
   <!-- CASE DETAIL -->
   <div id="case-view" class="card wide hidden"></div>
 
+  <!-- STATEMENT -->
+  <div id="statement-view" class="card wide hidden"></div>
+
   <!-- TEMPLATES -->
   <div id="templates-view" class="card wide hidden"></div>
 
@@ -682,20 +716,20 @@
   const CODES = { BGC: "Bank giro credit", BP: "Bill payment", CHG: "Charge", CHQ: "Cheque", CPT: "Cash machine",
                   DD: "Direct debit", DEB: "Debit card", DEP: "Deposit", FPI: "Faster payment in",
                   FPO: "Faster payment out", SO: "Standing order", TFR: "Transfer" };
-  let txCode = "", pick = "all";
+  let pick = "all";
   const dateLong = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // ---- navigation -----------------------------------------------------------------------
   let currentCase = null, banner = "";
-  const VIEWS = ["portal", "case", "templates", "how"];
-  const TITLES = { portal: "Cases", case: "Cases",
+  const VIEWS = ["portal", "case", "statement", "templates", "how"];
+  const TITLES = { portal: "Cases", case: "Cases", statement: "Cases",
                    templates: "Templates", how: "How it works" };
   function showView(view) {
     VIEWS.forEach((v) => $(v + "-view").classList.toggle("hidden", v !== view));
     document.querySelectorAll(".sidebar-link").forEach((b) =>
-      b.classList.toggle("active", b.dataset.view === view || (view === "case" && b.dataset.view === "portal")));
+      b.classList.toggle("active", b.dataset.view === view || ((view === "case" || view === "statement") && b.dataset.view === "portal")));
     $("page-title").textContent = TITLES[view];
-    $("mobile-nav").value = view === "case" ? "portal" : view;
+    $("mobile-nav").value = view === "case" || view === "statement" ? "portal" : view;
     if (view === "portal") renderPortal();
     if (view === "templates") renderTemplates();
     window.scrollTo(0, 0);
@@ -750,7 +784,7 @@
 
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
-    if (currentCase !== c) { txCode = ""; pick = "all"; }
+    if (currentCase !== c) pick = "all";
     currentCase = c;
     showView("case"); renderCase();
   }
@@ -898,8 +932,10 @@
       if (value === null || value === undefined) value = "";
       if (kind === "money" && value !== "") value = gbp(value);
       const p = prov[path] || {};
+      const salary = /^applicants\[(\d+)\]\.income\.(basic_salary|self_employed_profit)$/.exec(path);
       return { label: label, path: path, value: String(value), origin: p.origin || "", status: p.status || "",
-               said: said[path] || "", src: tokensFor(c, idx, path, p.origin || "", p.status || "") };
+               said: said[path] || "", src: tokensFor(c, idx, path, p.origin || "", p.status || ""),
+               verify: salary && data.applicants[+salary[1]] ? data.applicants[+salary[1]].key : null };
     };
     data.applicants.forEach((a, i) => {
       const who = a.full_name || `Applicant ${i + 1}`;
@@ -920,7 +956,7 @@
       ${D.sections.map((name) => [name, sections[name].filter((r) => r.value !== "")]).map(([name, rows]) => rows.length ? `
       <div class="detail-block src-group"><div class="detail-block-header">${esc(name)}</div>
         <div class="table-wrap"><table><thead><tr><th>Field</th><th class="num">Figure</th><th>From</th><th class="num">Customer said</th><th>Status</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr data-src="${esc(r.src)}"><td>${esc(r.label)}</td><td class="num">${esc(r.value)}</td>
+        <tbody>${rows.map((r) => `<tr data-src="${esc(r.src)}"><td>${esc(r.label)}${r.verify ? `<div style="margin-top:4px">${verifyHtml(c, r.verify)}</div>` : ""}</td><td class="num">${esc(r.value)}</td>
           <td class="small muted">${esc(r.origin ? SOURCE[r.origin] || label(r.origin) : "")}</td>
           <td class="num small muted">${esc(r.said)}</td>
           <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>` : "").join("")}</div>`;
@@ -1094,25 +1130,189 @@
     }).join("");
   }
 
-  // Each account month by month, for when one is picked.
-  function breakdownHtml(c) {
-    const each = [];
-    c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => {
-      ((c.accounts[p.key] || {}).accounts || []).forEach((a) => each.push([p, a.id, "acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]));
-    });
-    const blocks = each.map(([p, account, src, title]) => {
-      const b = E.breakdown(c, p.key, account);
-      const head = (title) => `<thead><tr><th>${title}</th>${b.months.map((m) => `<th class="num">${esc(monthLabel(m))}</th>`).join("")}<th class="num">Average</th></tr></thead>`;
-      const row = (label, r, strong) => `<tr><td>${strong ? `<strong>${esc(label)}</strong>` : esc(label)}</td>${r.months.map((v) => `<td class="num">${strong ? `<strong>${gbp(v)}</strong>` : gbp(v)}</td>`).join("")}<td class="num"><strong>${gbp(r.average)}</strong></td></tr>`;
-      const body = p.role === "COMPANY"
-        ? `<table>${head("Business account")}<tbody>${row("Money in", b.moneyIn)}${row("Money out", b.moneyOut)}</tbody></table>`
-        : `<table>${head("Full income")}<tbody>${b.income.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No income identified.</td></tr>'}${row("Total income", b.incomeTotal, true)}</tbody></table>
-           <table style="margin-top:12px">${head("Full expenditure")}<tbody>${b.expenditure.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No spending identified.</td></tr>'}${row("Total expenditure", b.expenditureTotal, true)}</tbody></table>`;
-      return `<div class="detail-block" data-src="${esc(src)}"><div class="detail-block-header">${esc(title)}</div><div class="table-wrap">${body}</div></div>`;
-    }).join("");
-    return blocks ? `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
-      <p class="section-note">From the bank statements. Household · all sources adds up every account in the household, with a column for each so you can see which account is doing what; pick an account above to see it month by month.</p>${householdHtml(c)}${blocks}</div>` : "";
+  // ---- the bank report (cases/screens.bank_reports, cases/_bank_report.html) ------------------
+  // For each source the picker offers: the household, each person, a company,
+  // each account. Accounts with sort code, number and balance; the months'
+  // calculated income, expenditure and disposable income with the graph; the
+  // full breakdowns by primary and sub category; the last 30 and 90 days.
+  const caseEnd = (c) => c.transactions.reduce((m, t) => (t.date > m ? t.date : m), "");
+  function bankBlocks(c) {
+    const tables = {}; household(c).forEach((h) => { tables[h.src] = h; });
+    const end = caseEnd(c), name = (k) => (c.parties.find((p) => p.key === k) || {}).name || k;
+    const block = (src, title, keys, account, business) => {
+      const span = [...new Set(keys.flatMap((k) => c.months[k] || []))].sort();
+      if (!span.length) return null;
+      const txs = c.transactions.filter((t) => keys.includes(t.party) && (!account || t.account === account));
+      const held = keys.flatMap((k) => ((c.accounts[k] || {}).accounts || []).map((a) => Object.assign({ who: name(k) }, a)))
+        .filter((a) => !account || a.id === account);
+      return { src: src, title: title, accounts: held, business: !!business, household: tables[src] || null,
+               verify: keys.length === 1 && !business ? keys[0] : null,
+               report: E.bankReport(txs, span, business, end, D.category_paths) };
+    };
+    const people = c.parties.filter((p) => p.role !== "COMPANY" && (c.months[p.key] || []).length), out = [];
+    if (people.length) {
+      out.push(block("all", "The household", people.map((p) => p.key)));
+      if (people.length > 1) people.forEach((p) => out.push(block("person:" + p.key, p.name, [p.key])));
+    }
+    c.parties.filter((p) => p.role === "COMPANY" && (c.months[p.key] || []).length)
+      .forEach((p) => out.push(block("all person:" + p.key, p.name || "The business", [p.key], null, true)));
+    c.parties.forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) =>
+      out.push(block("acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`, [p.key], a.id, p.role === "COMPANY"))));
+    return out.filter(Boolean);
   }
+
+  // Verify with HMRC: the broker asks the hub to check this person's income.
+  function verifyHtml(c, key) {
+    const p = c.parties.find((x) => x.key === key);
+    if (!p || p.role === "COMPANY") return "";
+    if ((c.verify || {})[key]) return pill("prefilled", "Sent to HMRC to verify");
+    return c.status === "COMPLETE" ? "" : `<button class="btn-verify" data-verify="${esc(key)}" title="Ask the hub to verify this income with HMRC">Verify with HMRC</button>`;
+  }
+
+  function bankReportHtml(c) {
+    const blocks = bankBlocks(c);
+    if (!blocks.length) return "";
+    const money = (x) => x.months.map((v) => `<td class="num">${gbp(v)}</td>`).join("") + `<td class="num">${gbp(x.total)}</td><td class="num">${gbp(x.average)}</td>`;
+    const head = (r, first) => `<thead><tr><th>${first}</th>${r.labels.map((m) => `<th class="num">${esc(m)}</th>`).join("")}<th class="num">${r.months.length}-month total</th><th class="num">Average</th></tr></thead>`;
+    const html = blocks.map((b) => {
+      const r = b.report, n = r.months.length, h = b.household;
+      const accounts = `<div class="table-wrap"><table><thead><tr><th>Bank account</th><th>Sort code</th><th>Account number</th><th class="num">Balance</th></tr></thead><tbody>${b.accounts.map((a) => `
+        <tr><td><strong>${esc(a.provider)}</strong><br><span class="small muted">${esc(a.holder || a.who)} · ${esc(a.kind)} · <em>Open Banking</em></span></td>
+          <td class="mono">${esc(a.sort_code || "–")}</td><td class="mono">${esc(a.number || "–")}</td>
+          <td class="num">${a.balance === null || a.balance === undefined ? '<span class="muted">–</span>' : `<strong>${gbp(a.balance)}</strong>`}</td></tr>`).join("")}</tbody></table></div>`;
+      const overview = `<h3 class="sub-band">${b.business ? "Money in and out" : "Standard affordability"} <span class="muted">· ${n} complete month${n === 1 ? "" : "s"}</span></h3>
+        <div class="table-wrap"><table>${head(r, "Overview")}<tbody>${r.overview.map((x) => `<tr${x.bold ? ' class="strong"' : ""}><td>${esc(x.label)}</td>${x.months.map((v) => `<td class="num">${gbp(v)}</td>`).join("")}<td class="num">${gbp(x.total)}</td><td class="num"><strong>${gbp(x.average)}</strong></td></tr>`).join("")}</tbody></table></div>
+        ${r.chart ? `<figure class="chart-box">${E.chartSvg(r.chart)}<figcaption><span class="key key-in"></span>${b.business ? "Money in" : "Income"} <span class="key key-out"></span>${b.business ? "Money out" : "Expenditure"} <span class="key key-left"></span>${b.business ? "Net" : "Left over"}</figcaption></figure>` : ""}`;
+      let which = "";
+      if (h) {
+        const cell = (v) => v === null ? '<span class="muted">–</span>' : gbp(v);
+        const row = (label, x, cls) => `<tr${cls ? ` class="${cls}"` : ""}><td>${label}</td>${x.values.map((v) => `<td class="num">${cell(v)}</td>`).join("")}<td class="num"><strong>${gbp(x.total)}</strong></td></tr>`;
+        const body = h.company ? row("Money in", h.moneyIn) + row("Money out", h.moneyOut)
+          : h.income.map((x) => row(esc(x.label), x)).join("") + row("Total income", h.incomeTotal, "strong")
+            + h.expenditure.map((x) => row(esc(x.label), x)).join("") + row("Total expenditure", h.expenditureTotal, "strong")
+            + row('Left over <span class="muted" style="font-weight:400">(income less expenditure)</span>', h.left, "strong");
+        which = `<h3 class="sub-band">Which account does what <span class="muted">· a month, every account added together</span></h3>
+          <div class="table-wrap"><table><thead><tr><th></th>${h.cols.map((col) => `<th class="num">${esc(col.who)}<br><span class="muted" style="font-weight:400">${esc(col.account)}</span></th>`).join("")}<th class="num">${esc(h.totalLabel)}</th></tr></thead>
+          <tbody>${body}</tbody></table></div>`;
+      }
+      let tables = "";
+      if (!b.business) {
+        tables = [["income", "Full income breakdown", r.income, r.incomeTotal, "No income identified."],
+                  ["expenditure", "Full expenditure breakdown", r.expenditure, r.expenditureTotal, "No spending identified."]]
+          .map(([kind, title, rows, total, empty]) => `<h3 class="sub-band">${title}</h3>
+          <div class="table-wrap"><table>${head(r, 'Primary category<br><span class="muted" style="font-weight:400">sub category</span>')}<tbody>
+          ${rows.map((x) => `<tr class="primary-row"><td>${esc(x.primary)}${kind === "income" && x.primary === "Salary" && b.verify ? " " + verifyHtml(c, b.verify) : ""}</td>${money(x)}</tr>`
+            + x.subs.map((s) => `<tr class="sub-row"><td>${esc(s.sub)}</td>${money(s)}</tr>`).join("")).join("") || `<tr><td colspan="99" class="small muted">${empty}</td></tr>`}
+          <tr class="strong"><td>Total</td>${money(total)}</tr></tbody></table></div>`).join("");
+        tables += `<details style="margin-top:12px" class="payments-detail"><summary>Sub category breakdown: the last 30 and 90 days</summary>
+          ${[["Credits", r.credits], ["Debits", r.debits]].map(([title, rows]) => `<div class="table-wrap"><table style="margin-top:8px">
+            <thead><tr><th>${title}: primary category</th><th>Sub category</th><th class="num"># last 30</th><th class="num">Value last 30</th><th class="num"># last 90</th><th class="num">Value last 90</th></tr></thead>
+            <tbody>${rows.map((x) => `<tr><td>${esc(x.primary)}</td><td>${esc(x.sub)}</td><td class="num">${x.n30}</td><td class="num">${gbp(x.v30)}</td><td class="num">${x.n90}</td><td class="num"><strong>${gbp(x.v90)}</strong></td></tr>`).join("")
+              || '<tr><td colspan="6" class="small muted">None in the last 90 days.</td></tr>'}</tbody></table></div>`).join("")}</details>`;
+      }
+      return `<div class="bank-report" data-src="${esc(b.src)}"><div class="band">${esc(b.title)}</div>${accounts}${overview}${which}${tables}</div>`;
+    }).join("");
+    return `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
+      <div class="section-note" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:260px">From the bank statements, laid out as a bank report. Household · all sources adds up every account in the household; pick a person or an account above to see theirs on its own.</span>
+        <button class="btn-primary" data-open-statement style="width:auto;padding:9px 16px;font-size:13px">Statement: every transaction</button></div>${html}</div>`;
+  }
+
+  // ---- the statement: every transaction, as a page of its own (cases/statement.html) -----------
+  let stFilters = {};
+  function statementRows(c) {
+    const balances = {}, accountName = {}, names = {};
+    c.parties.forEach((p) => { names[p.key] = p.name; });
+    Object.values(c.accounts).forEach((acc) => acc.accounts.forEach((a) => { balances[a.id] = a.balance; accountName[a.id] = `${a.provider} ${a.account}`; }));
+    const business = new Set(c.parties.filter((p) => p.role === "COMPANY").map((p) => p.key));
+    return E.statement(c.transactions, balances, D.category_paths).map((t) => Object.assign(t, {
+      who: names[t.party] || t.party, accountName: accountName[t.account] || "", business: business.has(t.party) }));
+  }
+  const dayLabel = (d) => `${d.slice(8, 10)} ${E.MONTHS[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}`;
+  function renderStatement() {
+    const c = currentCase, rows = statementRows(c);
+    const accounts = [];
+    c.parties.forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => accounts.push(Object.assign({ who: p.name, party: p.key }, a))));
+    const people = c.parties.filter((p) => accounts.some((a) => a.party === p.key));
+    const codes = [...new Set(rows.map((t) => t.code).filter(Boolean))].sort();
+    const primaries = [...new Set(rows.map((t) => t.primary))].sort();
+    const first = rows.length ? rows[0].date : "", last = rows.length ? rows[rows.length - 1].date : "";
+    const ddmmyyyy = (d) => d ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : "";
+    const opt = (v, text, key) => `<option value="${esc(v)}"${stFilters[key] === v ? " selected" : ""}>${esc(text)}</option>`;
+    $("statement-view").innerHTML = `
+      <button class="back-link" id="statement-back">&larr; ${esc(caseTitle(c))}</button>
+      <div class="eyebrow muted">${esc(c.reference)}</div>
+      <h1 class="title">STATEMENT</h1>
+      <p class="subtitle">${esc(caseTitle(c))} · every transaction from the Open Banking, oldest first${first ? `, ${ddmmyyyy(first)} to ${ddmmyyyy(last)}` : ""}. Each balance is the account's balance after that transaction, worked back from its balance today.</p>
+      <div class="table-wrap"><table><thead><tr><th>Bank account</th><th>Whose</th><th>Sort code</th><th>Account number</th><th class="num">Balance</th></tr></thead>
+        <tbody>${accounts.map((a) => `<tr><td><strong>${esc(a.provider)}</strong> <span class="small muted">${esc(a.kind)}</span></td><td>${esc(a.holder || a.who)}</td>
+          <td class="mono">${esc(a.sort_code || "–")}</td><td class="mono">${esc(a.number || "–")}</td>
+          <td class="num">${a.balance === null || a.balance === undefined ? '<span class="muted">–</span>' : `<strong>${gbp(a.balance)}</strong>`}</td></tr>`).join("")}</tbody></table></div>
+      <div class="statement-filters" style="margin-top:16px">
+        <input type="text" id="st-search" placeholder="Search descriptions" value="${esc(stFilters["st-search"] || "")}">
+        ${people.length > 1 ? `<select id="st-person"><option value="">Everyone</option>${people.map((p) => opt(p.key, p.name, "st-person")).join("")}</select>` : ""}
+        <select id="st-account"><option value="">Every account</option>${accounts.map((a) => opt(a.id, `${a.who} · ${a.provider} ${a.account}`, "st-account")).join("")}</select>
+        <select id="st-code"><option value="">Every type</option>${codes.map((k) => opt(k, `${k} – ${CODES[k] || k}`, "st-code")).join("")}</select>
+        <select id="st-category"><option value="">Every category</option>${primaries.map((k) => opt(k, k, "st-category")).join("")}</select>
+        <select id="st-way"><option value="">In and out</option>${opt("in", "Money in", "st-way")}${opt("out", "Money out", "st-way")}</select>
+        <label class="small muted">From <input type="date" id="st-from" value="${esc(stFilters["st-from"] || first)}" min="${first}" max="${last}"></label>
+        <label class="small muted">To <input type="date" id="st-to" value="${esc(stFilters["st-to"] || last)}" min="${first}" max="${last}"></label>
+        <button class="btn-secondary" id="st-clear">Clear</button>
+        <span class="small muted" id="st-count" style="margin-left:auto"></span>
+      </div>
+      <div class="table-wrap"><table class="statement">
+        <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Type</th><th class="num">Amount</th><th class="num">Balance</th><th></th></tr></thead>
+        <tbody id="st-rows">${rows.map((t) => `
+          <tr data-party="${esc(t.party)}" data-account="${esc(t.account || "")}" data-code="${esc(t.code || "")}" data-primary="${esc(t.primary)}"
+              data-date="${esc(t.date)}" data-amount="${esc(t.amount)}" data-search="${esc([t.description, t.primary, t.sub, t.provider].join(" ").toLowerCase())}">
+            <td class="st-date" style="white-space:nowrap">${dayLabel(t.date)}</td>
+            <td class="small muted" style="white-space:nowrap">${esc(t.who)}<br>${esc(t.accountName)}</td>
+            <td>${esc(t.description)}<br><span class="small muted">${t.business ? `Business account · money ${E.num(t.amount) < 0 ? "out" : "in"}` : esc(t.primary) + (t.sub ? " &gt; " + esc(t.sub) : "")}${t.provider ? ` · <span class="mono">${esc(t.provider)}</span>` : ""}</span></td>
+            <td class="mono" title="${esc(CODES[t.code] || "")}">${esc(t.code || "–")}</td>
+            <td class="num"><strong>${gbp(t.amount)}</strong></td>
+            <td class="num">${t.balance === null ? '<span class="muted">–</span>' : gbp(t.balance)}</td>
+            <td>${!t.business && c.status !== "COMPLETE" ? `<details><summary class="small muted" style="white-space:nowrap">${esc(BASIS[t.basis] || t.basis)}</summary>
+              <div class="inline-form" style="margin:6px 0 0;flex-wrap:nowrap">${categorySelect(t.category, `data-st-cat="${esc(t.id)}"`)}
+                <label class="check"><input type="checkbox" data-st-remember="${esc(t.id)}" /> remember</label>
+                <button class="btn-secondary" data-st-change="${esc(t.id)}">Change</button></div></details>`
+              : `<span class="small muted">${esc(BASIS[t.basis] || t.basis || "")}</span>`}</td>
+          </tr>`).join("") || '<tr><td colspan="7" class="small muted">No transactions on this case.</td></tr>'}</tbody></table></div>
+      <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real bank statement.</p>`;
+    const ids = ["st-search", "st-person", "st-account", "st-code", "st-category", "st-way", "st-from", "st-to"];
+    const val = (id) => ($(id) ? $(id).value : "");
+    const filter = () => {
+      ids.forEach((id) => { stFilters[id] = val(id); });
+      const words = val("st-search").toLowerCase().split(/\s+/).filter(Boolean);
+      let shown = 0, inn = 0, out = 0, lastDay = "";
+      const all = [...document.querySelectorAll("#st-rows tr[data-date]")];
+      all.forEach((r) => {
+        const a = parseFloat(r.dataset.amount);
+        const on = words.every((w) => r.dataset.search.includes(w)) && (!val("st-person") || r.dataset.party === val("st-person"))
+          && (!val("st-account") || r.dataset.account === val("st-account")) && (!val("st-code") || r.dataset.code === val("st-code"))
+          && (!val("st-category") || r.dataset.primary === val("st-category")) && (!val("st-way") || (val("st-way") === "in") === (a > 0))
+          && (!val("st-from") || r.dataset.date >= val("st-from")) && (!val("st-to") || r.dataset.date <= val("st-to"));
+        r.style.display = on ? "" : "none";
+        if (!on) return;
+        shown++; if (a > 0) inn += a; else out -= a;
+        // A day's date once, at its first transaction, as a statement prints it.
+        r.querySelector(".st-date").style.visibility = r.dataset.date === lastDay ? "hidden" : "";
+        r.classList.toggle("day", r.dataset.date !== lastDay && lastDay !== "");
+        lastDay = r.dataset.date;
+      });
+      $("st-count").textContent = `${shown} of ${all.length} transactions · in ${gbp(inn)} · out ${gbp(out)}`;
+    };
+    ids.forEach((id) => { if ($(id)) { $(id).addEventListener("input", filter); $(id).addEventListener("change", filter); } });
+    $("st-clear").addEventListener("click", () => { stFilters = {}; renderStatement(); });
+    $("statement-back").addEventListener("click", () => { showView("case"); renderCase(); });
+    document.querySelectorAll("[data-st-change]").forEach((b) => b.addEventListener("click", () => {
+      const id = b.dataset.stChange;
+      const cat = document.querySelector(`[data-st-cat="${CSS.escape(id)}"]`).value;
+      const remember = document.querySelector(`[data-st-remember="${CSS.escape(id)}"]`).checked;
+      if (cat === "TRANSFER") { alert("Transfers are found by pairing both sides; choose what the money was for."); return; }
+      E.recategorise(state.cases, c, id, cat, remember, WHO, D); save(); renderStatement();
+    }));
+    filter();
+  }
+  function openStatement() { stFilters = {}; showView("statement"); renderStatement(); }
 
   // Each credit report on its own, as it arrived.
   function creditHtml(c) {
@@ -1169,16 +1369,6 @@
           <label class="check"><input type="checkbox" data-remember-for="${esc(t.id)}" checked /> remember for this merchant${ts.length > 1 ? ` (moves all ${ts.length})` : ""}</label>
           <button class="btn-primary" data-categorise="${esc(t.id)}">Categorise</button></div></div>`;
     }).join("");
-    const txRows = c.transactions.slice().sort((a, b) => b.date.localeCompare(a.date)).map((t) => `
-      <tr data-code="${esc(t.code || "")}" data-src="all acct:${esc(t.account || "")}"${txCode && t.code !== txCode ? ' style="display:none"' : ""}><td class="mono">${esc(t.date)}</td>
-        <td class="mono" title="${esc(CODES[t.code] || "")}">${esc(t.code || "–")}</td><td class="small muted">${esc(accountName[t.account] || "")}</td>
-        <td>${esc(t.description)}${t.provider ? `<br><span class="mono muted">${esc(t.provider)}</span>` : ""}</td>
-        <td class="num">${gbp(t.amount)}</td>${business.has(t.party)
-          ? `<td>Business account</td><td>${pill("derived", "MONEY IN / OUT")}</td><td></td></tr>` : `<td>${esc(CAT[t.category] || t.category)}</td>
-        <td>${pill(t.basis === "NONE" ? "difference" : ["OVERRIDE", "MEMORY"].includes(t.basis) ? "verified" : "derived", BASIS[t.basis] || t.basis)}</td>
-        <td><div class="inline-form" style="margin:0;flex-wrap:nowrap">${categorySelect(t.category, `data-row-cat="${esc(t.id)}"`)}
-          <label class="check"><input type="checkbox" data-row-remember="${esc(t.id)}" /> remember</label>
-          <button class="btn-secondary" data-change="${esc(t.id)}">Change</button></div></td></tr>`}`).join("");
 
     const decided = c.findings.filter((f) => f.decision && !f.decision.default && f.decision.kind !== "RESOLVED");
     const matches = c.findings.filter((f) => f.outcome === "MATCH");
@@ -1198,13 +1388,14 @@
       <p class="case-meta"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span> ${statusPill(c)}
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
       <div class="case-actions">
+        <button class="btn-secondary" data-open-statement>Statement</button>
         <button class="btn-secondary" id="dl-pack">Download Data Pack</button>
         <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
       </div>
       ${summaryHtml(c)}
       ${pickerHtml(c)}
 
-      ${breakdownHtml(c)}
+      ${bankReportHtml(c)}
 
       <div data-src="all">${glanceHtml(c)}</div>
 
@@ -1235,14 +1426,8 @@
       </div>
 
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
-        <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which.</p>
-        ${toCategorise}
-        <details class="payments-detail"><summary>All categorised transactions (${c.transactions.length}) – how each was placed</summary>
-          <div class="inline-form" style="margin:10px 0">
-            <label class="check">Code <select id="tx-code"><option value="">All</option>${codes.map((k) => `<option value="${esc(k)}" ${k === txCode ? "selected" : ""}>${esc(k)} – ${esc(CODES[k] || k)}</option>`).join("")}</select></label>
-            <span class="small muted" id="tx-count"></span></div>
-          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Code</th><th>Account</th><th>Description</th><th class="num">Amount</th><th>Category</th><th>Placed by</th><th></th></tr></thead>
-          <tbody id="tx-rows">${txRows}</tbody></table></div></details></div>` : ""}
+        <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which. Every transaction, with its balance, category and filters, is on the <button class="link-button" data-open-statement>Statement</button> (${c.transactions.length}).</p>
+        ${toCategorise || '<div class="panel small">Every transaction is categorised.</div>'}</div>` : ""}
 
       <div class="section" data-src="all"><h2>Outputs</h2>
         <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
@@ -1261,15 +1446,16 @@
     banner = "";
 
     $("case-back").addEventListener("click", () => showView("portal"));
-    const filterRows = () => {
-      let shown = 0, all = 0;
-      document.querySelectorAll("#tx-rows tr").forEach((r) => {
-        const on = !txCode || r.dataset.code === txCode;
-        r.style.display = on ? "" : "none";
-        if (!r.classList.contains("src-off")) { all++; if (on) shown++; }
-      });
-      if ($("tx-count")) $("tx-count").textContent = txCode ? `${shown} of ${all}` : "";
-    };
+    const filterRows = () => {};
+    document.querySelectorAll("[data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
+    document.querySelectorAll("[data-verify]").forEach((b) => b.addEventListener("click", () => {
+      const key = b.dataset.verify, at = new Date().toISOString();
+      c.verify = Object.assign({}, c.verify, { [key]: { by: WHO, at: at } });
+      const p = c.parties.find((x) => x.key === key) || {};
+      c.factfind.audit.push({ at: at, by: WHO, path: `${p.name || key}: income`, old: null,
+                              new: "Sent to HMRC to verify", origin: "BROKER", status: "", reason: "" });
+      save(); renderCase();
+    }));
     document.querySelectorAll("[data-flag-link]").forEach((a) => a.addEventListener("click", () => {
       pick = "all";
       document.querySelectorAll("[data-pick]").forEach((x) => { x.className = x.dataset.pick === pick ? "btn-primary" : "btn-secondary"; });
@@ -1281,10 +1467,6 @@
       applyPick(); filterRows();
     }));
     applyPick();
-    if ($("tx-code")) {
-      $("tx-code").addEventListener("change", (e) => { txCode = e.target.value; filterRows(); });
-      filterRows();
-    }
     document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
       E.accept(c, b.dataset.accept, WHO, D.lines); save(); renderCase();
     }));
@@ -1356,99 +1538,236 @@
     });
   }
 
+  // The case report, laid out as the service's (cases/report.py) and the C2C
+  // bank report: the accounts, the months with the graph, the full
+  // breakdowns, the credit reports and fact find, then the STATEMENT.
   function downloadReport(c, button) {
     return withButton(button, "Writing the report…", async () => {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: "pt", format: "a4" });
-      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-      const g = E.glance(c), s = c.factfind.data.summary;
-      const names = (key) => (c.parties.find((p) => p.key === key) || {}).name || key;
-      const pink = [230, 23, 88], ink = [28, 27, 31];
-      const marked = new Set();
-      const watermark = () => {
-        const page = doc.internal.getCurrentPageInfo().pageNumber;
-        if (marked.has(page)) return;
-        marked.add(page);
+      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 42, width = W - 2 * M;
+      const pink = [230, 23, 88], ink = [28, 27, 31], muted = [123, 123, 123], band = [241, 241, 242], green = [60, 184, 154];
+      const s = c.factfind.data.summary, data = c.factfind.data;
+      const now = new Date(), generated = `${String(now.getDate()).padStart(2, "0")} ${E.MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+      let y = 50;
+      const room = (h) => { if (y + h > H - 50) { doc.addPage(); y = 50; } };
+      const section = (title) => {
+        room(70);
+        doc.setFillColor(...pink); doc.rect(M, y, width, 22, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(255, 255, 255);
+        doc.text(title, M + 7, y + 15); doc.setTextColor(...ink); doc.setFont("helvetica", "normal");
+        y += 26;
+      };
+      // rows: arrays of strings or {content, styles}; bold / sub: row indexes in the body.
+      // jsPDF's built-in fonts have no arrow.
+      const plain = (v) => typeof v === "string" ? v.replace(/ → /g, " to ") : v && typeof v.content === "string" ? Object.assign({}, v, { content: plain(v.content) }) : v;
+      const table = (head, body, opts) => {
+        opts = opts || {};
+        body = body.map((row) => row.map(plain));
+        const bold = new Set(opts.bold || []), sub = new Set(opts.sub || []), nums = new Set(opts.nums || []);
+        doc.autoTable({ startY: y, head: head ? [head] : undefined, body: body, theme: "plain",
+          styles: { fontSize: 8, cellPadding: 4, textColor: ink, valign: "middle" },
+          headStyles: { fontStyle: "bold", fontSize: 7.8 }, alternateRowStyles: opts.zebra === false ? {} : { fillColor: band },
+          columnStyles: Object.assign({}, ...[...nums].map((i) => ({ [i]: { halign: "right" } })), opts.columns || {}),
+          margin: { left: opts.left || M, right: opts.right === undefined ? M : opts.right, top: 50, bottom: 50 },
+          tableWidth: opts.tableWidth || "auto",
+          didParseCell: (d) => {
+            if (d.section === "head" && nums.has(d.column.index)) d.cell.styles.halign = "right";
+            if (d.section !== "body") return;
+            if (bold.has(d.row.index)) d.cell.styles.fontStyle = "bold";
+            if (sub.has(d.row.index)) { d.cell.styles.textColor = muted; d.cell.styles.fontSize = 7.5;
+                                        if (d.column.index === 0) d.cell.styles.cellPadding = { left: 14, top: 4, bottom: 4, right: 4 }; }
+          } });
+        y = doc.lastAutoTable.finalY + 12;
+      };
+
+      // The heading and the case's details.
+      doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(...ink);
+      doc.text("Affordability Report (DEMO)", M, y + 12);
+      // The logo, shrunk first: the file is print size and jsPDF would embed it whole.
+      try {
+        const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = "logo.png"; });
+        const canvas = document.createElement("canvas"); canvas.width = 384; canvas.height = Math.round(384 * img.height / img.width);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        doc.addImage(canvas.toDataURL("image/png"), "PNG", W - M - 96, y - 6, 96, 96 * canvas.height / canvas.width, undefined, "FAST");
+      } catch (e) { /* no logo */ }
+      y += 40;
+      const people = c.parties.filter((p) => p.role !== "COMPANY");
+      const dobs = data.applicants.map((a) => a.date_of_birth).filter(Boolean).join(" · ") || "–";
+      const span = (() => { const d = c.transactions.map((t) => t.date).sort(); return d.length ? `${d[0].split("-").reverse().join("/")} - ${d[d.length - 1].split("-").reverse().join("/")}` : "–"; })();
+      const half = (width - 24) / 2, top = y;
+      const facts = (rows, left) => table(null, rows.map(([k, v]) => [{ content: k, styles: { fontStyle: "bold" } }, v]),
+        { left: left, right: W - left - half, tableWidth: half, columns: { 0: { cellWidth: half * 0.42 } } });
+      facts([["Customer name" + (people.length > 1 ? "s" : ""), caseTitle(c)], ["Reference", c.reference], ["Date of birth", dobs],
+             ["Case type", label(c.type)], ["Prepared for", `${D.firm || "ABC Ltd"} · adviser ${WHO}`]], M);
+      const after = y; y = top;
+      facts([["Report date", now.toLocaleString("en-GB")], ["Case opened", dateLong(c.opened)], ["Transaction date range", span],
+             ["Status", c.status === "COMPLETE" ? "Complete" : "Broker review"]], M + half + 24);
+      y = Math.max(after, y) + 4;
+
+      // What the adviser needs to know, first.
+      section("Summary");
+      table(["", "What to know"], flagsFor(c).map((f) => [{ content: FLAG_WORD[f.level], styles: { fontStyle: "bold",
+        textColor: f.level === "ACT" ? [163, 15, 63] : f.level === "CHECK" ? [138, 90, 6] : [31, 122, 99] } },
+        f.title + (f.detail ? "\n" + f.detail : "")]), { columns: { 0: { cellWidth: 50 } } });
+
+      // The bank accounts, with sort code, number and balance.
+      const accounts = [];
+      c.parties.forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => accounts.push(Object.assign({ who: p.name }, a))));
+      if (accounts.length) {
+        section("Bank Accounts");
+        table(["Bank accounts", "Sort code", "Account number", "Balance"], accounts.map((a) => [
+          `${a.provider}\n${a.holder || a.who} · ${a.kind} (Open Banking)`, a.sort_code || "–", a.number || "–",
+          { content: a.balance === null || a.balance === undefined ? "–" : gbp(a.balance), styles: { fontStyle: "bold" } }]),
+          { nums: [3], columns: { 0: { cellWidth: width * 0.46 } } });
+      }
+
+      // The household (and a company), as the bank report reads one account.
+      const drawChart = (g, business) => {
+        const k = width / g.w, h = g.h * k;
+        room(h + 30);
+        const Y = (v) => y + v * k;
+        doc.setFontSize(6.5); doc.setTextColor(...muted); doc.setDrawColor(223, 225, 230); doc.setLineWidth(0.5);
+        g.grid.forEach((l) => { doc.line(M + g.left * k, Y(l.y), M + g.right * k, Y(l.y)); doc.text(l.label, M + g.left * k - 4, Y(l.y) + 2, { align: "right" }); });
+        g.bars.forEach((b) => { doc.setFillColor(...(b.kind === "in" ? green : pink)); doc.rect(M + b.x * k, Y(Math.min(b.y, g.zero)), b.w * k, Math.abs(b.h) * k, "F"); });
+        doc.setDrawColor(...ink); doc.setLineWidth(1.2);
+        g.points.forEach((p, i) => { if (i) doc.line(M + g.points[i - 1].x * k, Y(g.points[i - 1].y), M + p.x * k, Y(p.y)); });
+        doc.setFillColor(...ink); g.points.forEach((p) => doc.circle(M + p.x * k, Y(p.y), 1.8, "F"));
+        doc.setFontSize(7); g.ticks.forEach((t) => doc.text(t.label, M + t.x * k, Y(g.base) - 2, { align: "center" }));
+        let x = M + g.left * k;
+        [[green, business ? "Money in" : "Income"], [pink, business ? "Money out" : "Expenditure"], [ink, business ? "Net" : "Left over"]].forEach(([col, name]) => {
+          doc.setFillColor(...col); doc.rect(x, y + h + 4, 7, 7, "F"); doc.text(name, x + 10, y + h + 10); x += 70;
+        });
+        doc.setTextColor(...ink); y += h + 24;
+      };
+      bankBlocks(c).filter((b) => b.src.split(" ")[0] === "all").forEach((b) => {
+        const r = b.report, n = r.months.length, nums = [...Array(n + 2).keys()].map((i) => i + 1);
+        const line = (x) => x.months.map(gbp).concat([gbp(x.total), gbp(x.average)]);
+        room(r.chart ? 400 : 140);    // the table and its graph on one page
+        section(`${b.business ? "Money in and out" : "Standard Affordability"} · ${b.title}`);
+        table(["Overview"].concat(r.labels, [`${n}-month total`, "Average"]), r.overview.map((x) => [x.label].concat(line(x))),
+              { nums: nums, bold: [2] });
+        if (r.chart) drawChart(r.chart, b.business);
+        const h = b.household;
+        if (h && !h.company) {
+          const cell = (v) => v === null ? "–" : gbp(v);
+          const row = (labelText, x) => [labelText].concat(x.values.map(cell), [gbp(x.total)]);
+          const body = h.income.map((x) => row(x.label, x)), bold = [];
+          bold.push(body.length); body.push(row("Total income", h.incomeTotal));
+          h.expenditure.forEach((x) => body.push(row(x.label, x)));
+          bold.push(body.length); body.push(row("Total expenditure", h.expenditureTotal));
+          bold.push(body.length); body.push(row("Left over (income less expenditure)", h.left));
+          section("Which account does what · a month, every account added together");
+          table([""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.totalLabel]), body,
+                { nums: [...Array(h.cols.length + 1).keys()].map((i) => i + 1), bold: bold });
+        }
+        if (b.business) return;
+        [["Full Income Breakdown", r.income, r.incomeTotal, "No income identified."],
+         ["Full Expenses Breakdown", r.expenditure, r.expenditureTotal, "No spending identified."]].forEach(([title, items, total, empty]) => {
+          const body = [], bold = [], sub = [];
+          items.forEach((x) => {
+            bold.push(body.length); body.push([x.primary].concat(line(x)));
+            x.subs.forEach((s2) => { sub.push(body.length); body.push([s2.sub].concat(line(s2))); });
+          });
+          if (!items.length) body.push([empty]);
+          bold.push(body.length); body.push(["Total"].concat(line(total)));
+          section(title);
+          table(["Category / sub category"].concat(r.labels, [`${n}-month total`, "Average"]), body,
+                { nums: nums, bold: bold, sub: sub, zebra: false });
+        });
+        [["Credits", r.credits], ["Debits", r.debits]].forEach(([name, items]) => {
+          section(`Sub Category Breakdown ${name}`);
+          table(["Primary category", "Sub category", "# last 30", "Value last 30", "# last 90", "Value last 90"],
+                items.length ? items.map((x) => [x.primary, x.sub, String(x.n30), gbp(x.v30), String(x.n90), gbp(x.v90)])
+                             : [["None in the last 90 days.", "", "", "", "", ""]], { nums: [2, 3, 4, 5] });
+        });
+      });
+
+      // Each credit report on its own.
+      c.pack.parties.filter((p) => p.credit).forEach((p) => {
+        const cr = p.credit, rows = (cr.accounts || []).map((a) => [a.lender, label(a.type), label(a.status), gbp(a.balance),
+          gbp(a.monthly_payment), a.credit_limit ? gbp(a.credit_limit) : "–"]);
+        section(`Credit Report · ${p.name}`);
+        table(["Lender", "Type", "Status", "Balance", "Monthly", "Limit"], rows.length ? rows : [["No accounts on the report.", "", "", "", "", ""]],
+              { nums: [3, 4, 5] });
+      });
+
+      // The fact find.
+      section("Fact Find · Applicants");
+      table(["Applicant", "Date of birth", "Employment", "Gross income (annual)", "Net pay (monthly)"],
+            data.applicants.map((a) => [a.full_name || "", a.date_of_birth || "–", a.employment_status || "–",
+                                        gbp((a.income || {}).total), gbp((a.income || {}).net_monthly)]), { nums: [3, 4] });
+      const sent = Object.entries(c.verify || {});
+      if (sent.length) {
+        doc.setFontSize(7.5); doc.setTextColor(...muted);
+        doc.text("Sent to HMRC to verify income: " + sent.map(([k, v]) => `${(c.parties.find((p) => p.key === k) || {}).name || k} (by ${v.by}, ${v.at.slice(0, 10)})`).join("; "), M, y - 4);
+        doc.setTextColor(...ink); y += 8;
+      }
+      section("Fact Find · Budget (monthly, household)");
+      D.groups.forEach((group) => {
+        const rows = D.lines.filter((l) => l.group === group && E.num(data.expenditure[l.key])).map((l) => {
+          const p = c.factfind.provenance[`expenditure.${l.key}`] || {};
+          return [l.label, gbp(data.expenditure[l.key]), SOURCE[p.origin] || p.origin || "", p.status ? label(p.status) : ""];
+        });
+        if (rows.length) table([group, "£ a month", "From", "Status"], rows, { nums: [1] });
+      });
+      table(null, [["Total outgoings", gbp(s.monthly_expenditure)], ["Net income", gbp(s.net_monthly_income)],
+                   [{ content: "Disposable", styles: { fontStyle: "bold" } }, { content: gbp(s.disposable_monthly), styles: { fontStyle: "bold" } }]],
+            { nums: [1] });
+      const commitments = data.commitments.filter(Boolean);
+      if (commitments.length) {
+        section("Fact Find · Credit Commitments");
+        table(["Lender", "Type", "Whose", "Balance", "Monthly"], commitments.map((r) => [r.lender, String(r.type || "").replace(/_/g, " ").toLowerCase(),
+          r.owner_name || r.owner, gbp(r.balance), gbp(r.monthly_payment)]), { nums: [3, 4] });
+      }
+      const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
+      if (decided.length) {
+        section("Decisions");
+        table(["Decision", "Finding", "By"], decided.map((f) => [f.decision.default ? "Report's figure taken by default"
+          : f.decision.kind === "ACCEPT" ? "Accepted the report's figure" : "Kept the entered figure" + (f.decision.reason ? ` — “${f.decision.reason}”` : ""),
+          f.message, f.decision.by]), { columns: { 0: { cellWidth: width * 0.2 }, 2: { cellWidth: width * 0.22 } } });
+      }
+      const open = openFindings(c);
+      section("Still Open");
+      if (open.length) table(["", "Source", "Finding"], open.map((f) => [OUTCOME[f.outcome] || f.outcome, SOURCE[f.source] || f.source, f.message]));
+      else { doc.setFontSize(9); doc.text("Nothing is open.", M, y + 4); y += 18; }
+      section("Sources");
+      table(["Person", "Reports"], c.parties.map((p) => [p.name, p.sources.map((x) => SOURCE[x] || x).join(", ")]));
+      if (c.factfind.audit.length) {
+        section("Audit Trail");
+        table(["When", "Who", "What", "Was", "Now"], c.factfind.audit.map((e) => [String(e.at).slice(0, 16).replace("T", " "), e.by,
+          /^(applicants|expenditure|commitments|company)/.test(e.path) ? fieldLabel(e.path, c) : e.path,
+          e.old === null ? "–" : String(e.old), String(e.new)]));
+      }
+
+      // The full transaction list, on pages of its own.
+      const rows = statementRows(c);
+      if (rows.length) {
+        doc.addPage(); y = 50;
+        section("STATEMENT");
+        doc.setFontSize(7.5); doc.setTextColor(...muted);
+        doc.text("Every transaction from the Open Banking, oldest first. The balance is the account's balance after the transaction, worked back from its balance today.", M, y + 2);
+        doc.setTextColor(...ink); y += 12;
+        let last = "";
+        table(["Date", "Description", "Account", "Type", "Amount", "Balance"], rows.map((t) => {
+          const day = t.date === last ? "" : dayLabel(t.date); last = t.date;
+          return [day, `${t.description}\n${t.business ? "Business account" : t.primary + (t.sub ? " > " + t.sub : "")}`, t.accountName,
+                  t.code || "", { content: gbp(t.amount), styles: { fontStyle: "bold" } }, t.balance === null ? "–" : gbp(t.balance)];
+        }), { nums: [4, 5], columns: { 0: { cellWidth: 62 }, 3: { cellWidth: 34 } } });
+      }
+
+      // Page X of Y, and DEMO on every page.
+      const pages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pages; i++) {
+        doc.setPage(i);
         doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.06 }));
         doc.setFontSize(90); doc.setTextColor(...pink);
         doc.text("DEMO ONLY", W / 2, H / 2, { align: "center", angle: 30 });
         doc.restoreGraphicsState();
-      };
-      watermark();
-      doc.setTextColor(...pink); doc.setFontSize(18); doc.text("Affordability case report (DEMO)", 40, 52);
-      doc.setTextColor(...ink); doc.setFontSize(10);
-      doc.text(`${caseTitle(c)} · ${c.reference} · ${c.type.toLowerCase()} · opened ${dateLong(c.opened)}`, 40, 70);
-      doc.text(`Prepared for ABC Ltd · ${new Date().toLocaleString("en-GB")}`, 40, 84);
-      // Heading first, then its table; a heading never sits alone at the
-      // foot of a page.
-      const table = (title, head, body) => {
-        let y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : 96) + 28;
-        if (y > H - 90) { doc.addPage(); watermark(); y = 56; }
-        doc.setFontSize(11); doc.setTextColor(...pink); doc.text(title, 40, y); doc.setTextColor(...ink);
-        doc.autoTable({ startY: y + 6, head: [head], body: body,
-          theme: "grid", styles: { fontSize: 8.5, cellPadding: 4 }, headStyles: { fillColor: pink },
-          margin: { left: 40, right: 40, top: 50 }, didDrawPage: () => watermark() });
-      };
-      // What the adviser needs to know, first.
-      table("Summary", ["", "What to know"], flagsFor(c).map((f) => [FLAG_WORD[f.level], f.title + (f.detail ? "\n" + f.detail : "")]));
-      // Then the household added together, a column for each account.
-      household(c).filter((h) => h.src.split(" ")[0] === "all").forEach((h) => {
-        const head = [""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.totalLabel]);
-        const line = (label, r) => [label].concat(r.values.map((v) => v === null ? "–" : gbp(v)), [gbp(r.total)]);
-        const blank = (t) => [t].concat(h.cols.map(() => ""), [""]);
-        table(h.company ? "The business, a month" : "The household, a month: every account added together", head,
-              h.company ? [line("Money in", h.moneyIn), line("Money out", h.moneyOut)]
-                : [blank("Income")].concat(h.income.map((r) => line(r.label, r)), [line("Total income", h.incomeTotal), blank("Expenditure")],
-                                         h.expenditure.map((r) => line(r.label, r)), [line("Total expenditure", h.expenditureTotal),
-                                         line("Left over (income less expenditure)", h.left)]));
-      });
-      // Then each account month by month.
-      c.parties.filter((p) => (c.months[p.key] || []).length).forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => {
-        const b = E.breakdown(c, p.key, a.id), head = b.months.map(monthLabel).concat(["Average"]);
-        const title = `${p.name} · ${a.provider} ${a.account}`;
-        const line = (label, r) => [label].concat(r.months.map(gbp), [gbp(r.average)]);
-        if (p.role === "COMPANY") {
-          table(title, ["Business account"].concat(head),
-                [line("Money in", b.moneyIn), line("Money out", b.moneyOut)]);
-          return;
-        }
-        table(title, ["Full income"].concat(head),
-              b.income.map((r) => line(CAT[r.category] || r.category, r)).concat([line("Total income", b.incomeTotal)]));
-        table(" ", ["Full expenditure"].concat(head),
-              b.expenditure.map((r) => line(CAT[r.category] || r.category, r)).concat([line("Total expenditure", b.expenditureTotal)]));
-      }));
-      table("At a glance", ["Measure", "Value"], [
-        ["Disposable income a month", gbp(g.disposable)], ["Outgoings a month", gbp(g.outgoings)],
-        ["Net monthly income", gbp(s.net_monthly_income)], ["Household gross income a year", gbp(s.gross_annual_income)],
-        ["Figures backed by a report", `${g.backed} of ${g.total}`], ["Differences still open", String(g.differences)]]);
-      const decided = c.findings.filter((f) => f.decision && f.decision.kind !== "RESOLVED");
-      if (decided.length) table("Decisions", ["Decision", "By", "Finding"], decided.map((f) => [
-        f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered" + (f.decision.reason ? ` — “${f.decision.reason}”` : ""),
-        f.decision.by, f.message]));
-      const open = openFindings(c);
-      if (open.length) table("Still open", ["Outcome", "Source", "Finding"], open.map((f) => [f.outcome, SOURCE[f.source] || f.source, f.message]));
-      table("Budget planner (monthly)", ["Line", "Group", "£"], D.lines.filter((l) => E.num(c.factfind.data.expenditure[l.key]))
-        .map((l) => [l.label, l.group, E.fmt(c.factfind.data.expenditure[l.key])]));
-      const commitments = c.factfind.data.commitments.filter(Boolean);
-      if (commitments.length) table("Commitments", ["Whose", "Lender", "Balance", "Monthly"],
-        commitments.map((r) => [r.owner_name || r.owner, r.lender, gbp(r.balance), gbp(r.monthly_payment)]));
-      c.pack.parties.filter((p) => p.credit).forEach((p) => {
-        const rows = (p.credit.accounts || []).map((a) => [a.lender, label(a.type), label(a.status), gbp(a.balance),
-                                                           gbp(a.monthly_payment), a.credit_limit ? gbp(a.credit_limit) : "–"]);
-        table(`Credit report · ${p.name}`, ["Lender", "Type", "Status", "Balance", "Monthly", "Limit"],
-              rows.length ? rows : [["No accounts on the report.", "", "", "", "", ""]]);
-      });
-      const bankRows = [];
-      Object.entries(c.accounts).forEach(([party, acc]) => acc.accounts.forEach((a) => bankRows.push(
-        [`${a.provider} ${a.account}`, names(party), a.kind, String(a.transactions), gbp(a.money_in), gbp(a.money_out)])));
-      if (bankRows.length) table("Bank accounts", ["Account", "Whose", "Kind", "Transactions", "In a month", "Out a month"], bankRows);
-      table("Sources", ["Person", "Reports"], c.parties.map((p) => [p.name, p.sources.map((x) => SOURCE[x] || x).join(", ")]));
-      if (c.factfind.audit.length) table("Audit trail", ["When", "Who", "What", "Was", "Now"],
-        c.factfind.audit.map((e) => [String(e.at).slice(0, 16).replace("T", " "), e.by,
-          /^(applicants|expenditure|commitments|company)/.test(e.path) ? fieldLabel(e.path, c) : e.path,
-          e.old === null ? "–" : String(e.old), String(e.new)]));
-      doc.setFontSize(8); doc.setTextColor(120);
-      doc.text("DEMO document generated from fictional test data. Not a real affordability assessment.", 40, H - 24);
+        doc.setFontSize(7.5); doc.setTextColor(...muted);
+        doc.text(`Page ${i} of ${pages}  ·  ${c.reference}  ·  DEMO from fictional test data`, M, H - 24);
+        doc.text(`Generated on ${generated}`, W - M, H - 24, { align: "right" });
+      }
       doc.save(`${c.reference} case report.pdf`);
       made(c, "report", `${c.reference} case report.pdf`, button);
     });

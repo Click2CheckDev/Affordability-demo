@@ -439,6 +439,152 @@
     }).filter((x) => x.added || String(x.was) !== String(x.now));
   }
 
+  // --- the bank report (affordability/bankreport.py; the two must agree) -------------------
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const DAY = 86400000;
+  // As Python's %b: "Sep", where some browsers' en-GB says "Sept".
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  // Who paid it, from the statement line, as bankreport.payer.
+  function payer(description) {
+    const words = String(description || "").toUpperCase().replace(/[^A-Z ]/g, " ").split(/\s+/)
+      .filter((w) => w.length > 1 && !["BGC", "FPI", "BACS", "REF", "FP"].includes(w));
+    return words.slice(0, 4).map((w) => w.charAt(0) + w.slice(1).toLowerCase()).join(" ") || "Unknown payer";
+  }
+  // [primary, sub] for a category; ``paths`` is the demo data's category_paths.
+  function categoryPath(category, description, paths) {
+    const p = paths[category];
+    if (!p) return ["Other spending", String(category).replace(/_/g, " ").toLowerCase().replace(/^./, (x) => x.toUpperCase())];
+    return [p[0], p[1] === null ? payer(description) : p[1]];
+  }
+  const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+
+  function bankReport(txs, months, business, end, paths) {
+    months = months.slice().sort();
+    const n = months.length, at = {}, zeros = () => months.map(() => 0);
+    months.forEach((m, i) => { at[m] = i; });
+    const money = (vals) => { vals = vals.map(r2); const total = r2(vals.reduce((s, v) => s + v, 0));
+                              return { months: vals, total: total, average: n ? r2(total / n) : 0 }; };
+    const mIn = zeros(), mOut = zeros(), groups = { income: {}, expenditure: {} };
+    txs.forEach((t) => {
+      const i = at[t.date.slice(0, 7)];
+      if (i === undefined) return;
+      const a = num(t.amount);
+      if (a > 0 && t.category !== "TRANSFER" && t.category !== "REFUND") mIn[i] += a;
+      if (a < 0 && t.category !== "TRANSFER") mOut[i] -= a;
+      const kind = isIncome(t.category) && a > 0 ? "income" : isSpending(t.category) && a < 0 ? "expenditure" : null;
+      if (!kind) return;
+      const [p, s] = categoryPath(t.category, t.description, paths);
+      const g = groups[kind][p] = groups[kind][p] || {};
+      (g[s] = g[s] || zeros())[i] += Math.abs(a);
+    });
+    const table = (kind) => {
+      const rows = Object.entries(groups[kind]).map(([p, subs]) => {
+        const sums = months.map((_, i) => Object.values(subs).reduce((s, v) => s + v[i], 0));
+        return Object.assign({ primary: p }, money(sums), { subs: Object.entries(subs)
+          .map(([s, v]) => Object.assign({ sub: s }, money(v))).sort((a, b) => b.total - a.total) });
+      }).sort((a, b) => b.total - a.total);
+      return [rows, money(months.map((_, i) => rows.reduce((s, r) => s + r.months[i], 0)))];
+    };
+    const [income, incomeTotal] = table("income"), [expenditure, expenditureTotal] = table("expenditure");
+    let overview, ins, outs;
+    if (business) {
+      overview = [Object.assign({ label: "Money in" }, money(mIn)), Object.assign({ label: "Money out" }, money(mOut)),
+                  Object.assign({ label: "Net", bold: true }, money(mIn.map((v, i) => v - mOut[i])))];
+      ins = mIn.map(r2); outs = mOut.map(r2);
+    } else {
+      ins = incomeTotal.months; outs = expenditureTotal.months;
+      overview = [Object.assign({ label: "Calculated income" }, incomeTotal),
+                  Object.assign({ label: "Calculated expenditure" }, expenditureTotal),
+                  Object.assign({ label: "Disposable income", bold: true }, money(ins.map((v, i) => v - outs[i])))];
+    }
+    const recentRows = recent(txs, end, paths);
+    const labels = months.map((m) => MONTHS[+m.slice(5, 7) - 1] + " " + m.slice(0, 4));
+    return { months: months, labels: labels, business: !!business, overview: overview,
+             income: income, incomeTotal: incomeTotal, expenditure: expenditure, expenditureTotal: expenditureTotal,
+             credits: recentRows[0], debits: recentRows[1], chart: chart(ins, outs, labels.map((l) => l.slice(0, 3))) };
+  }
+
+  // How many and how much in the last 30 and 90 days, by sub category.
+  function recent(txs, end, paths) {
+    if (!txs.length) return [[], []];
+    const day = (iso) => Date.parse(iso + "T00:00:00Z") / DAY;
+    const last = end ? day(end) : Math.max(...txs.map((t) => day(t.date)));
+    const out = { credits: {}, debits: {} };
+    txs.forEach((t) => {
+      const a = num(t.amount);
+      const kind = isIncome(t.category) && a > 0 ? "credits" : isSpending(t.category) && a < 0 ? "debits" : null;
+      const d = day(t.date);
+      if (!kind || d > last || d <= last - 90) return;
+      const [p, s] = categoryPath(t.category, t.description, paths), key = p + "\u0000" + s;
+      const row = out[kind][key] = out[kind][key] || { primary: p, sub: s, n30: 0, v30: 0, n90: 0, v90: 0 };
+      row.n90++; row.v90 = r2(row.v90 + Math.abs(a));
+      if (d > last - 30) { row.n30++; row.v30 = r2(row.v30 + Math.abs(a)); }
+    });
+    const rows = (k) => Object.values(out[k]).sort((a, b) => cmp(a.primary, b.primary) || cmp(a.sub, b.sub));
+    return [rows("credits"), rows("debits")];
+  }
+
+  // Every transaction, oldest first, with its account's balance after it,
+  // worked back from the account's balance today.
+  function statement(txs, balances, paths) {
+    const rows = txs.slice().sort((a, b) => cmp(a.date, b.date));
+    const running = {};
+    Object.entries(balances).forEach(([k, v]) => { if (v !== null && v !== undefined && v !== "") running[k] = num(v); });
+    const out = [];
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const t = rows[i], balance = running[t.account];
+      const [p, s] = categoryPath(t.category, t.description, paths);
+      out.push(Object.assign({}, t, { primary: p, sub: s, balance: balance === undefined ? null : r2(balance) }));
+      if (balance !== undefined) running[t.account] = r2(balance - num(t.amount));
+    }
+    return out.reverse();
+  }
+
+  // The graph's geometry, as bankreport.chart: bars for income and
+  // expenditure, a line for what is left over.
+  const CHART = { w: 640, h: 220, left: 64, right: 12, top: 14, bottom: 30 };
+  function nice(value) {
+    if (value <= 0) return 100;
+    const step = Math.pow(10, String(Math.trunc(value)).length - 1);
+    for (const k of [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (step * k >= value) return step * k;
+    return step * 10;
+  }
+  function chart(ins, outs, labels) {
+    if (!ins.length) return null;
+    const left = ins.map((v, i) => v - outs[i]);
+    const low = Math.min(0, ...left);
+    const top = nice(Math.max(0, ...ins, ...outs)), bottom = low < 0 ? -nice(-low) : 0;
+    const plotH = CHART.h - CHART.top - CHART.bottom, plotW = CHART.w - CHART.left - CHART.right;
+    const y = (v) => CHART.top + (top - v) / (top - bottom) * plotH;
+    const r1 = (v) => Math.round(v * 10) / 10;
+    const group = plotW / ins.length, bars = [], points = [], ticks = [], grid = [];
+    ins.forEach((a, i) => {
+      const x = CHART.left + group * i, w = group * 0.3, b = outs[i], d = left[i];
+      bars.push({ x: r1(x + group * 0.17), y: r1(y(a)), w: r1(w), h: r1(y(0) - y(a)), kind: "in", value: a });
+      bars.push({ x: r1(x + group * 0.53), y: r1(y(b)), w: r1(w), h: r1(y(0) - y(b)), kind: "out", value: b });
+      points.push({ x: r1(x + group / 2), y: r1(y(d)), value: r2(d) });
+      ticks.push({ x: r1(x + group / 2), label: labels[i] });
+    });
+    for (let k = 0; k < 5; k++) {
+      const v = bottom + (top - bottom) * k / 4;
+      grid.push({ y: r1(y(v)), label: (v < 0 ? "-£" : "£") + Math.trunc(Math.abs(v)).toLocaleString("en-GB") });
+    }
+    return { w: CHART.w, h: CHART.h, left: CHART.left, right: CHART.w - CHART.right, zero: r1(y(0)),
+             bars: bars, points: points, ticks: ticks, grid: grid, base: CHART.h - CHART.bottom + 16 };
+  }
+  function chartSvg(g) {
+    if (!g) return "";
+    const money = (v) => (v < 0 ? "-£" + fmt(-v) : "£" + fmt(v));
+    return `<svg viewBox="0 0 ${g.w} ${g.h}" class="chart" role="img" aria-label="Income and expenditure by month">`
+      + g.grid.map((l) => `<line x1="${g.left}" x2="${g.right}" y1="${l.y}" y2="${l.y}" class="grid"/><text x="${g.left - 6}" y="${l.y + 3}" text-anchor="end">${l.label}</text>`).join("")
+      + `<line x1="${g.left}" x2="${g.right}" y1="${g.zero}" y2="${g.zero}" class="axis"/>`
+      + g.bars.map((b) => `<rect x="${b.x}" y="${Math.min(b.y, g.zero)}" width="${b.w}" height="${Math.abs(b.h)}" class="bar-${b.kind}"><title>${money(b.value)}</title></rect>`).join("")
+      + `<path d="${g.points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" ")}" class="left"/>`
+      + g.points.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="3" class="left-dot"><title>Left over ${money(p.value)}</title></circle>`).join("")
+      + g.ticks.map((t) => `<text x="${t.x}" y="${g.base}" text-anchor="middle">${t.label}</text>`).join("") + "</svg>";
+  }
+
   // --- the C2C Data Pack, as it stands now ------------------------------------------------
   function dataPack(c, lines) {
     const pack = JSON.parse(JSON.stringify(c.pack));
@@ -463,7 +609,8 @@
 
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
                 bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
-                makeCase, rename, glance, changes, dataPack };
+                makeCase, rename, glance, changes, dataPack, bankReport, statement, chart, chartSvg, payer,
+                categoryPath, MONTHS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);
