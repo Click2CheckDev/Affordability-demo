@@ -376,9 +376,11 @@
   .filter-row label { color: var(--muted); }
   .filter-row select { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 3px; border: 1px solid var(--border-strong); background: var(--surface); }
 /* ---- Affordability demo additions ---- */
-  .portal-card { max-width: none; width: 100%; padding: 28px 28px; }
+  .sidebar { width: 220px; }
+  main { padding: 28px 20px; }
+  .portal-card { max-width: none; width: 100%; padding: 24px 20px; }
   .case-table th, .case-table td { padding-left: 8px; padding-right: 8px; }
-  .case-table td:first-child { min-width: 220px; }
+  .case-table td:first-child { min-width: 180px; }
   .case-table td { vertical-align: top; }
   .card.wide { max-width: 980px; }
   .stat-row.four { grid-template-columns: repeat(4, 1fr); }
@@ -532,7 +534,7 @@
     </div>
     <div class="inline-form" style="margin:0 0 12px">
       <select id="case-adviser"><option value="">Every adviser</option></select>
-      <input type="text" id="case-search" placeholder="Search by name, reference or adviser" />
+      <input type="text" id="case-search" placeholder="Search by name or reference" />
       <select id="case-state"><option value="">Any status</option><option value="REVIEW">Broker review</option><option value="COMPLETE">Complete</option></select>
       <select id="case-type"><option value="">Residential and commercial</option><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select>
       <span class="small muted" id="case-count"></span>
@@ -540,7 +542,7 @@
     <p class="small muted" style="margin:0 0 8px">Income, outgoings and disposable income are a month, for the whole household.</p>
     <div class="table-wrap">
     <table class="case-table">
-      <thead><tr><th>Case</th><th>Status</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th><th>Sources</th><th>Notes</th><th>Opened</th></tr></thead>
+      <thead><tr><th>Case</th><th>Adviser</th><th>Status</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th><th>Sources</th></tr></thead>
       <tbody id="case-list"></tbody>
     </table>
     </div>
@@ -700,17 +702,16 @@
       const accounts = Object.values(c.accounts).reduce((n, acc) => n + acc.accounts.length, 0);
       const credit = c.pack.parties.filter((p) => p.credit).length;
       const notes = openFindings(c).filter((f) => f.outcome !== "DIFFERENCE").length, diffs = blocking(c);
-      const search = [caseTitle(c), c.reference, c.adviser].concat(people).join(" ").toLowerCase();
+      const search = [caseTitle(c), c.reference].concat(people).join(" ").toLowerCase();
       return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-adviser="${esc(c.adviser)}">
         <td><strong>${esc(caseTitle(c))}</strong><br><span class="small muted"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span>
-          ${esc(c.reference)} · ${esc(c.adviser)}${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}</span></td>
-        <td>${statusPill(c)}</td>
+          <span style="white-space:nowrap">${esc(c.reference)}</span>${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}</span></td>
+        <td>${esc(c.adviser)}<br><span class="small muted" style="white-space:nowrap">opened ${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</span></td>
+        <td>${statusPill(c)}${diffs || notes ? "<br>" : ""}${diffs ? pill("difference", `${diffs} TO DECIDE`) + " " : ""}${notes ? `<span class="small muted">${notes} note${notes === 1 ? "" : "s"}</span>` : ""}</td>
         <td class="num">${gbp(s.net_monthly_income)}</td>
         <td class="num">${gbp(s.monthly_expenditure)}</td>
         <td class="num"><strong>${gbp(s.disposable_monthly)}</strong></td>
         <td class="small muted" style="white-space:nowrap">${accounts} account${accounts === 1 ? "" : "s"}<br>${credit} credit report${credit === 1 ? "" : "s"}</td>
-        <td>${diffs ? pill("difference", `${diffs} TO DECIDE`) + " " : ""}${notes ? `<span class="small muted">${notes} note${notes === 1 ? "" : "s"}</span>` : diffs ? "" : '<span class="muted">—</span>'}</td>
-        <td style="white-space:nowrap">${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</td>
       </tr>`;
     }).join("");
     document.querySelectorAll("#case-list tr").forEach((tr) =>
