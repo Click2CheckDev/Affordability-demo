@@ -418,6 +418,20 @@
                    background: var(--surface, #fff); padding: 10px 0; margin: 0 0 8px; border-bottom: 1px solid var(--border); }
   .source-picker button { width: auto; padding: 6px 12px; font-size: 12.5px; }
   .src-off { display: none !important; }
+  .flag { display: inline-flex; justify-content: center; min-width: 46px; padding: 2px 8px; border-radius: 999px;
+          font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; flex-shrink: 0; }
+  .flag-ACT { background: rgba(230,23,88,0.12); color: var(--brand-ink); }
+  .flag-CHECK { background: rgba(224,150,30,0.16); color: #8a5a06; }
+  .flag-OK { background: rgba(60,184,154,0.14); color: var(--teal-ink); }
+  .summary-panel { border-left: 3px solid var(--teal); margin: 0 0 12px; }
+  .summary-panel.act { border-left-color: var(--brand); }
+  .summary-panel.check { border-left-color: #e0961e; }
+  .flags { list-style: none; padding: 0; margin: 10px 0 0; }
+  .flags li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid #f0f0f2; color: var(--ink); font-size: 14px; }
+  .flags li:first-child { border-top: 0; }
+  .flags a { color: inherit; text-decoration: none; }
+  .flags a:hover { text-decoration: underline; }
+  #case-view h2[id] { scroll-margin-top: 70px; }
   .case-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
   .case-actions button { width: auto; padding: 9px 16px; font-size: 13px; }
   .link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--brand); cursor: pointer; text-align: left; text-decoration: underline; }
@@ -535,6 +549,7 @@
     <div class="inline-form" style="margin:0 0 12px">
       <select id="case-adviser"><option value="">Every adviser</option></select>
       <input type="text" id="case-search" placeholder="Search by name or reference" />
+      <select id="case-attention"><option value="">Every case</option><option value="yes">Needs attention</option><option value="no">All clear</option></select>
       <select id="case-state"><option value="">Any status</option><option value="REVIEW">Broker review</option><option value="COMPLETE">Complete</option></select>
       <select id="case-type"><option value="">Residential and commercial</option><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select>
       <span class="small muted" id="case-count"></span>
@@ -542,7 +557,7 @@
     <p class="small muted" style="margin:0 0 8px">Income, outgoings and disposable income are a month, for the whole household.</p>
     <div class="table-wrap">
     <table class="case-table">
-      <thead><tr><th>Case</th><th>Adviser</th><th>Status</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th><th>Sources</th></tr></thead>
+      <thead><tr><th>Case</th><th>Adviser</th><th>Status · needs attention</th><th class="num">Income</th><th class="num">Outgoings</th><th class="num">Disposable</th></tr></thead>
       <tbody id="case-list"></tbody>
     </table>
     </div>
@@ -701,17 +716,17 @@
       const s = c.factfind.data.summary, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
       const accounts = Object.values(c.accounts).reduce((n, acc) => n + acc.accounts.length, 0);
       const credit = c.pack.parties.filter((p) => p.credit).length;
-      const notes = openFindings(c).filter((f) => f.outcome !== "DIFFERENCE").length, diffs = blocking(c);
+      const attention = flagsFor(c).filter((f) => f.level !== "OK");
       const search = [caseTitle(c), c.reference].concat(people).join(" ").toLowerCase();
-      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-adviser="${esc(c.adviser)}">
+      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-adviser="${esc(c.adviser)}" data-attention="${attention.length ? "yes" : ""}">
         <td><strong>${esc(caseTitle(c))}</strong><br><span class="small muted"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span>
-          <span style="white-space:nowrap">${esc(c.reference)}</span>${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}</span></td>
+          <span style="white-space:nowrap">${esc(c.reference)}</span>${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}
+          <br>${accounts} account${accounts === 1 ? "" : "s"} · ${credit} credit report${credit === 1 ? "" : "s"}</span></td>
         <td>${esc(c.adviser)}<br><span class="small muted" style="white-space:nowrap">opened ${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</span></td>
-        <td>${statusPill(c)}${diffs || notes ? "<br>" : ""}${diffs ? pill("difference", `${diffs} TO DECIDE`) + " " : ""}${notes ? `<span class="small muted">${notes} note${notes === 1 ? "" : "s"}</span>` : ""}</td>
+        <td style="min-width:220px">${statusPill(c)}<div style="margin-top:4px">${attention.slice(0, 3).map((f) => `<div class="small" style="margin:2px 0;color:var(--ink)">${flagPill(f.level)} ${esc(f.title)}</div>`).join("") || flagPill("OK").replace(">OK<", ">All clear<")}${attention.length > 3 ? `<div class="small muted">and ${attention.length - 3} more</div>` : ""}</div></td>
         <td class="num">${gbp(s.net_monthly_income)}</td>
         <td class="num">${gbp(s.monthly_expenditure)}</td>
         <td class="num"><strong>${gbp(s.disposable_monthly)}</strong></td>
-        <td class="small muted" style="white-space:nowrap">${accounts} account${accounts === 1 ? "" : "s"}<br>${credit} credit report${credit === 1 ? "" : "s"}</td>
       </tr>`;
     }).join("");
     document.querySelectorAll("#case-list tr").forEach((tr) =>
@@ -723,12 +738,13 @@
   }
   function filterCases() {
     const words = $("case-search").value.toLowerCase().split(/\s+/).filter(Boolean);
-    const st = $("case-state").value, ty = $("case-type").value, ad = $("case-adviser").value;
+    const st = $("case-state").value, ty = $("case-type").value, ad = $("case-adviser").value, at = $("case-attention").value;
     const rows = [...document.querySelectorAll("#case-list tr")]; let shown = 0;
     // The adviser filter is an adviser's own view: the counts follow it.
     const mine = rows.filter((r) => !ad || r.dataset.adviser === ad);
     rows.forEach((r) => {
-      const on = mine.includes(r) && words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty);
+      const on = mine.includes(r) && words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty)
+        && (!at || (at === "yes") === !!r.dataset.attention);
       r.style.display = on ? "" : "none"; if (on) shown++;
     });
     const n = (key, value) => mine.filter((r) => r.dataset[key] === value).length;
@@ -736,9 +752,9 @@
     $("stat-review").textContent = n("state", "REVIEW");
     $("stat-complete").textContent = n("state", "COMPLETE");
     $("stat-types").textContent = `${n("type", "RESIDENTIAL")} · ${n("type", "COMMERCIAL")}`;
-    $("case-count").textContent = words.length || st || ty || ad ? `${shown} of ${rows.length}` : "";
+    $("case-count").textContent = words.length || st || ty || ad || at ? `${shown} of ${rows.length}` : "";
   }
-  ["case-search", "case-state", "case-type", "case-adviser"].forEach((id) => {
+  ["case-search", "case-state", "case-type", "case-adviser", "case-attention"].forEach((id) => {
     $(id).addEventListener("input", filterCases); $(id).addEventListener("change", filterCases);
   });
 
@@ -909,7 +925,7 @@
       if (f.section === "Company" && !data.company) return;
       sections[f.section].push(row(f.label, f.path, f.kind));
     });
-    return `<div class="section src-group"><h2>Taken from the sources</h2>
+    return `<div class="section src-group"><h2 id="taken">Taken from the sources</h2>
       <p class="section-note">The fact find, made from the consented reports: the bank statements and credit report have priority over anything the customer entered. Where the customer said something different, it is shown beside the source's figure. In the service, the broker can keep the customer's figure instead, with a reason.</p>
       ${D.sections.map((name) => [name, sections[name].filter((r) => r.value !== "")]).map(([name, rows]) => rows.length ? `
       <div class="detail-block src-group"><div class="detail-block-header">${esc(name)}</div>
@@ -918,6 +934,82 @@
           <td class="small muted">${esc(r.origin ? SOURCE[r.origin] || label(r.origin) : "")}</td>
           <td class="num small muted">${esc(r.said)}</td>
           <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>` : "").join("")}</div>`;
+  }
+
+  // ---- what the adviser needs to know --------------------------------------------------
+  // The same rules as affordability/flags.py, with the same thresholds.
+  const FLAG_ORDER = { ACT: 0, CHECK: 1, OK: 2 };
+  function flagsFor(c) {
+    const s = c.factfind.data.summary || {}, data = c.factfind.data, num = E.num;
+    const open = c.findings.filter((f) => !f.decision);
+    const taken = c.findings.filter((f) => f.decision && f.decision.default);
+    const income = num(s.net_monthly_income), out = [];
+    const pct = (part, whole) => whole ? `${Math.round(part / whole * 100)}%` : "–";
+    const flag = (level, title, detail, anchor) => out.push({ level: level, title: title, detail: detail || "", anchor: anchor || "" });
+    const left = num(s.disposable_monthly);
+    const money = `Net income ${gbp(income)}, outgoings ${gbp(s.monthly_expenditure)}.`;
+    if (left < 0) flag("ACT", `Spends more than comes in: ${gbp(left)} a month`, money, "income");
+    else if (income && left < income * 0.10) flag("CHECK", `Little left over: ${gbp(left)} a month (${pct(left, income)} of income)`, money, "income");
+    else flag("OK", `${gbp(left)} a month left over (${pct(left, income)} of income)`, money, "income");
+    const repay = num(s.monthly_commitments);
+    if (income && repay) {
+      const share = repay / income;
+      flag(share >= 0.40 ? "ACT" : share >= 0.25 ? "CHECK" : "OK",
+           `Credit repayments ${gbp(repay)} a month (${pct(repay, income)} of income)`, "From the credit report and the bank.", "credit");
+    }
+    const adverse = open.filter((f) => f.outcome === "ALERT" && f.path.endsWith(".credit_history"));
+    if (adverse.length) flag("ACT", `Adverse credit: ${adverse.length} item${adverse.length > 1 ? "s" : ""} in the last six years`,
+                             adverse.map((f) => f.message).join(" "), "credit");
+    else if (c.pack.parties.some((p) => p.credit)) flag("OK", "No adverse credit in the last six years", "", "credit");
+    c.pack.parties.forEach((p) => ((p.credit || {}).accounts || []).forEach((a) => {
+      const limit = num(a.credit_limit), bal = num(a.balance);
+      if (a.status === "ACTIVE" && limit > 0 && bal / limit >= 0.75) {
+        flag(bal / limit >= 0.90 ? "ACT" : "CHECK", `${a.lender} card at ${pct(bal, limit)} of its limit`, `${p.name}: ${gbp(bal)} of ${gbp(limit)}.`, "credit");
+      }
+    }));
+    const gambling = open.find((f) => f.path === "expenditure.gambling" && f.outcome === "ALERT");
+    if (gambling) {
+      const amount = num(gambling.evidence);
+      flag(income && amount >= income * 0.10 ? "ACT" : "CHECK", `Gambling ${gbp(amount)} a month (${pct(amount, income)} of income)`,
+           "Regular payments to gambling sites in the bank statements.", "transactions");
+    } else if (c.transactions.length) flag("OK", "No regular gambling", "", "transactions");
+    const undisclosed = taken.filter((f) => f.action === "ADD_COMMITMENT");
+    if (undisclosed.length) flag("CHECK", `Customer didn't mention ${undisclosed.length} credit agreement${undisclosed.length > 1 ? "s" : ""}`,
+      "Added from the credit report: " + undisclosed.map((f) => `${((f.extra || {}).row || {}).lender || "a lender"} ${gbp(f.proposed)} a month`).join(", ") + ".", "taken");
+    const label = (path) => {
+      const m = /^commitments\[(\d+)\]/.exec(path), row = m && data.commitments[+m[1]];
+      if (row) return `${row.lender} payment`;
+      const name = fieldLabel(path, c); return name.charAt(0).toLowerCase() + name.slice(1);
+    };
+    const outgoings = taken.filter((f) => f.action !== "ADD_COMMITMENT" && /^(expenditure\.|commitments\[)/.test(f.path) && num(f.proposed) > num(f.declared));
+    if (outgoings.length) {
+      const more = outgoings.reduce((t, f) => t + num(f.proposed) - num(f.declared), 0);
+      flag("CHECK", `Customer understated outgoings by ${gbp(more)} a month`,
+           "Taken from the reports instead: " + outgoings.map((f) => `${label(f.path)} ${gbp(f.declared)} → ${gbp(f.proposed)}`).join(", ") + ".", "taken");
+    }
+    const earnings = taken.filter((f) => /^(company\.|applicants\[)/.test(f.path) && num(f.proposed) < num(f.declared));
+    earnings.forEach((f) => flag("CHECK", `Customer overstated ${f.path.startsWith("company.") ? "turnover" : "income"} by ${gbp(num(f.declared) - num(f.proposed))}`, f.message, "taken"));
+    if (!undisclosed.length && !outgoings.length && !earnings.length && c.findings.length) flag("OK", "Nothing hidden or understated by the customer", "", "taken");
+    const deciding = open.filter((f) => f.outcome === "DIFFERENCE");
+    if (deciding.length) flag("ACT", `${deciding.length} difference${deciding.length > 1 ? "s" : ""} to decide`, deciding[0].message, "decide");
+    open.forEach((f) => {
+      if (f.path.endsWith(".self_employed_profit")) flag("CHECK", "Self-employed profit needs the SA302 to check",
+        `${gbp(f.evidence)} a year arrives in the bank; Open Banking can't show profit.`, "decide");
+      else if (f.path.endsWith(".uncategorised")) flag("CHECK", `Transactions not yet categorised (${gbp(f.evidence)} out)`, f.message, "transactions");
+      else if (f.outcome === "UNVERIFIABLE") flag("CHECK", f.message.split(". ")[0].replace(/\.$/, "") + ".", "", "decide");
+      else if (f.outcome === "ALERT" && !adverse.includes(f) && f !== gambling) flag("CHECK", f.message, "", "decide");
+    });
+    return out.sort((a, b) => FLAG_ORDER[a.level] - FLAG_ORDER[b.level]);
+  }
+  const FLAG_WORD = { ACT: "Act", CHECK: "Check", OK: "OK" };
+  const flagPill = (level) => `<span class="flag flag-${level}">${FLAG_WORD[level]}</span>`;
+  function summaryHtml(c) {
+    const found = flagsFor(c), act = found.some((f) => f.level === "ACT"), check = found.some((f) => f.level === "CHECK");
+    const s = c.factfind.data.summary || {}, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
+    return `<div class="panel summary-panel ${act ? "act" : check ? "check" : "ok"}">
+      <strong>${act ? "Needs action" : check ? "Worth a check" : "All clear"}</strong>
+      <span class="small muted">· ${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month</span>
+      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor ? `<a href="#${f.anchor}" data-flag-link>${esc(f.title)}</a>` : esc(f.title)}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
   }
 
   // The source picker: everything merged, one bank account, or one credit report.
@@ -1028,7 +1120,7 @@
            <table style="margin-top:12px">${head("Full expenditure")}<tbody>${b.expenditure.map((r) => row(CAT[r.category] || r.category, r)).join("") || '<tr><td colspan="99" class="small">No spending identified.</td></tr>'}${row("Total expenditure", b.expenditureTotal, true)}</tbody></table>`;
       return `<div class="detail-block" data-src="${esc(src)}"><div class="detail-block-header">${esc(title)}</div><div class="table-wrap">${body}</div></div>`;
     }).join("");
-    return blocks ? `<div class="section src-group"><h2>Income and expenditure</h2>
+    return blocks ? `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
       <p class="section-note">From the bank statements. Household · all sources adds up every account in the household, with a column for each so you can see which account is doing what; pick an account above to see it month by month.</p>${householdHtml(c)}${blocks}</div>` : "";
   }
 
@@ -1045,7 +1137,7 @@
           <td class="num">${gbp(a.monthly_payment)}</td><td class="num">${a.credit_limit ? gbp(a.credit_limit) : "–"}</td></tr>`).join("")
           || '<tr><td colspan="6" class="small">No accounts on the report.</td></tr>'}</tbody></table></div>${courts}</div>`;
     }).join("");
-    return reports ? `<div class="section src-group"><h2>Credit report</h2>${reports}</div>` : "";
+    return reports ? `<div class="section src-group"><h2 id="credit">Credit report</h2>${reports}</div>` : "";
   }
 
   function renderCase() {
@@ -1119,6 +1211,7 @@
         <button class="btn-secondary" id="dl-pack">Download Data Pack</button>
         <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
       </div>
+      ${summaryHtml(c)}
       ${pickerHtml(c)}
 
       ${breakdownHtml(c)}
@@ -1135,7 +1228,7 @@
 
       ${creditHtml(c)}
 
-      <div class="section" data-src="all"><h2>To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
+      <div class="section" data-src="all"><h2 id="decide">To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
         ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
         ${notes.length ? `<h3 style="margin:18px 0 8px;font-size:15px;font-weight:500">Worth knowing</h3>${notes.map((f) => `<div class="panel finding ${f.outcome.toLowerCase()}">
           <div class="finding-head">${pill(f.outcome.toLowerCase(), OUTCOME[f.outcome] || f.outcome)}<span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
@@ -1151,7 +1244,7 @@
         </div>
       </div>
 
-      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
+      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
         <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which.</p>
         ${toCategorise}
         <details class="payments-detail"><summary>All categorised transactions (${c.transactions.length}) – how each was placed</summary>
@@ -1187,6 +1280,11 @@
       });
       if ($("tx-count")) $("tx-count").textContent = txCode ? `${shown} of ${all}` : "";
     };
+    document.querySelectorAll("[data-flag-link]").forEach((a) => a.addEventListener("click", () => {
+      pick = "all";
+      document.querySelectorAll("[data-pick]").forEach((x) => { x.className = x.dataset.pick === pick ? "btn-primary" : "btn-secondary"; });
+      applyPick(); filterRows();
+    }));
     document.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
       pick = b.dataset.pick;
       document.querySelectorAll("[data-pick]").forEach((x) => { x.className = x.dataset.pick === pick ? "btn-primary" : "btn-secondary"; });
@@ -1301,7 +1399,9 @@
           theme: "grid", styles: { fontSize: 8.5, cellPadding: 4 }, headStyles: { fillColor: pink },
           margin: { left: 40, right: 40, top: 50 }, didDrawPage: () => watermark() });
       };
-      // The household added together first, a column for each account.
+      // What the adviser needs to know, first.
+      table("Summary", ["", "What to know"], flagsFor(c).map((f) => [FLAG_WORD[f.level], f.title + (f.detail ? "\n" + f.detail : "")]));
+      // Then the household added together, a column for each account.
       household(c).filter((h) => h.src.split(" ")[0] === "all").forEach((h) => {
         const head = [""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.totalLabel]);
         const line = (label, r) => [label].concat(r.values.map((v) => v === null ? "–" : gbp(v)), [gbp(r.total)]);
