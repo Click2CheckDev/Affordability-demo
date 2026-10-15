@@ -1316,13 +1316,13 @@
       <h1 class="title">OPEN BANKING STATEMENT</h1>
       <p class="subtitle">${esc(caseTitle(c))} · every transaction from the Open Banking, oldest first${first ? `, ${ddmmyyyy(first)} to ${ddmmyyyy(last)}` : ""}. Each balance is the account's balance after that transaction, worked back from its balance today.</p>
       <div class="table-wrap"><table><thead><tr><th>Bank account</th><th>Whose</th><th>Sort code</th><th>Account number</th><th class="num">Balance</th></tr></thead>
-        <tbody>${accounts.map((a) => `<tr><td><strong>${esc(a.provider)}</strong> <span class="small muted">${esc(a.kind)}</span></td><td>${esc(a.holder || a.who)}</td>
+        <tbody>${accounts.map((a) => `<tr data-party="${esc(a.party)}"><td><strong>${esc(a.provider)}</strong> <span class="small muted">${esc(a.kind)}</span></td><td>${esc(a.holder || a.who)}</td>
           <td class="mono">${esc(a.sort_code || "–")}</td><td class="mono">${esc(a.number || "–")}</td>
           <td class="num">${a.balance === null || a.balance === undefined ? '<span class="muted">–</span>' : `<strong>${gbp(a.balance)}</strong>`}</td></tr>`).join("")}</tbody></table></div>
       <div class="statement-filters" style="margin-top:16px">
         <input type="text" id="st-search" placeholder="Search descriptions" value="${esc(stFilters["st-search"] || "")}">
         ${people.length > 1 ? `<select id="st-person"><option value="">Everyone</option>${people.map((p) => opt(p.key, p.name, "st-person")).join("")}</select>` : ""}
-        <select id="st-account"><option value="">Every account</option>${accounts.map((a) => opt(a.id, `${a.who} · ${a.provider} ${a.account}`, "st-account")).join("")}</select>
+        <select id="st-account"><option value="">Every account</option>${accounts.map((a) => opt(a.id, `${a.who} · ${a.provider} ${a.account}`, "st-account").replace("<option ", `<option data-party="${esc(a.party)}" `)).join("")}</select>
         <select id="st-code"><option value="">Every type</option>${codes.map((k) => opt(k, `${k} – ${CODES[k] || k}`, "st-code")).join("")}</select>
         <select id="st-category"><option value="">Every category</option>${primaries.map((k) => opt(k, k, "st-category")).join("")}</select>
         <select id="st-way"><option value="">In and out</option>${opt("in", "Money in", "st-way")}${opt("out", "Money out", "st-way")}</select>
@@ -1354,6 +1354,12 @@
     const ids = ["st-search", "st-person", "st-account", "st-code", "st-category", "st-way", "st-from", "st-to"];
     const val = (id) => ($(id) ? $(id).value : "");
     const filter = () => {
+      // A person picked: only their accounts, in the list and in the table.
+      const person = val("st-person");
+      document.querySelectorAll("#statement-view #st-account option[data-party], #statement-view tr[data-party]:not([data-date])").forEach((o) => {
+        o.hidden = !!person && o.dataset.party !== person;
+      });
+      if ($("st-account") && $("st-account").selectedOptions[0] && $("st-account").selectedOptions[0].hidden) $("st-account").value = "";
       ids.forEach((id) => { stFilters[id] = val(id); });
       const words = val("st-search").toLowerCase().split(/\s+/).filter(Boolean);
       let shown = 0, inn = 0, out = 0, lastDay = "";
@@ -1474,7 +1480,7 @@
       <div class="statement-filters" style="margin-top:12px">
         <input type="text" id="cr-search" placeholder="Search lenders">
         ${files.length > 1 ? `<select id="cr-person"><option value="">Everyone</option>${files.map((r) => `<option value="${esc(r.key)}">${esc(r.who)}</option>`).join("")}</select>` : ""}
-        <select id="cr-account"><option value="">Every account</option>${files.flatMap((r) => r.file.accounts.map((a) => `<option value="${esc(r.key)}:${esc(a.id)}">${esc(r.who)} · ${esc(a.lender)} ${esc((a.number || "").slice(-4))}</option>`)).join("")}</select>
+        <select id="cr-account"><option value="">Every account</option>${files.flatMap((r) => r.file.accounts.map((a) => `<option value="${esc(r.key)}:${esc(a.id)}" data-party="${esc(r.key)}">${esc(r.who)} · ${esc(a.lender)} ${esc((a.number || "").slice(-4))}</option>`)).join("")}</select>
         <select id="cr-group"><option value="">Every type</option>${CR_GROUPS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select>
         <select id="cr-status"><option value="">Any status</option><option value="active">Active</option><option value="settled">Settled</option><option value="default">Default</option><option value="arrears">Arrears</option></select>
         <select id="cr-record"><option value="">Any payment record</option><option value="missed">Missed payments</option><option value="clean">Always paid on time</option></select>
@@ -1494,6 +1500,9 @@
                             status: val("cr-status"), record: val("cr-record"), searches: val("cr-searches"),
                             from: val("cr-from") === first ? "" : val("cr-from"), to: val("cr-to") === last ? "" : val("cr-to") });
     const filter = () => {
+      // A person picked: only their accounts in the list.
+      document.querySelectorAll("#cr-account option[data-party]").forEach((o) => { o.hidden = !!val("cr-person") && o.dataset.party !== val("cr-person"); });
+      if ($("cr-account") && $("cr-account").selectedOptions[0] && $("cr-account").selectedOptions[0].hidden) $("cr-account").value = "";
       const shown = filterCredit(files, params()).files;
       let count = 0, all = 0;
       document.querySelectorAll("#credit-view .credit-file").forEach((f) => {
