@@ -466,6 +466,18 @@
   .btn-verify { width: auto; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
                 background: #fff; color: var(--brand); border: 1px solid var(--brand); margin-left: 6px; }
   .statement td { padding-top: 7px; padding-bottom: 7px; }
+  /* The Quilter budget planner (cases/base.html) */
+  .budget-switch { display: flex; gap: 2px; border-bottom: 1px solid #ececef; margin-bottom: 12px; }
+  .budget-switch button { width: auto; height: 34px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
+                          padding: 0 14px; font: inherit; font-size: 13.5px; color: var(--muted); }
+  .budget-switch button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
+  .budget[hidden] { display: none; }
+  .panel.budget { background: #fff; }
+  .budget-table td { padding-top: 7px; padding-bottom: 7px; }
+  .budget-table tr.budget-head td { background: #cecccc; font-weight: 600; font-size: 13px; color: var(--ink); }
+  .budget-table tr.budget-total td { font-weight: 600; background: #f3f3f5; }
+  .budget-table tr.budget-result td { font-weight: 700; font-size: 15px; border-top: 2px solid var(--brand); }
+  .budget-table tr.budget-zero td { color: var(--muted); }
   /* The credit report, as the credit file lays it out (cases/base.html) */
   .cr-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 16px; }
   .cr-grid.tight { gap: 24px; margin: 8px 0; }
@@ -1545,6 +1557,29 @@
       ${files.map(creditFileHtml).join("")}</div>` : "";
   }
 
+  // The Quilter budget planner: Aly's form or the Quilter CRM's categories (cases/_budget_planner.html).
+  let budgetLayout = "quilter";
+  function budgetHtml(c) {
+    const fromPill = (f) => pill(f === "Credit report" ? "difference" : f === "Open Banking" ? "verified" : "derived", f);
+    const layouts = Object.keys(D.budget_layouts).map((k) => E.budgetPlanner(c, k, D.budget_layouts, D.lines));
+    return `<div class="section" data-src="all"><h2 id="budget">Budget planner</h2>
+      <p class="section-note">The fact find on Quilter's budget planner: every figure from the bank statements and credit report, line by line, and what each is made of. Switch between Aly's form and the Quilter CRM's categories.</p>
+      <div class="budget-switch">${layouts.map((b) => `<button data-budget="${b.key}" class="${b.key === budgetLayout ? "active" : ""}">${esc(b.name)}</button>`).join("")}</div>
+      ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
+        <p class="small muted" style="margin:0 0 8px">${esc(b.note)}</p>
+        <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
+          <tr class="budget-head"><td colspan="3">${b.key === "crm" ? "Household income" : "Income"}</td></tr>
+          ${b.income.map((r) => `<tr${r.value === "0.00" ? ' class="budget-zero"' : ""}><td>${esc(r.label)}${r.before_tax ? `<br><span class="small muted">After tax; before tax ${gbp(r.before_tax)}</span>` : ""}</td>
+            <td class="num">${gbp(r.value)}</td><td>${r.from.map(fromPill).join(" ")}</td></tr>`).join("")}
+          <tr class="budget-total"><td>Total income</td><td class="num">${gbp(b.income_total)}</td><td></td></tr>
+          ${b.sections.map((s) => `<tr class="budget-head"><td colspan="3">${esc(s.title)}</td></tr>
+            ${s.rows.map((r) => `<tr${r.value === "0.00" ? ' class="budget-zero"' : ""}><td>${esc(r.label)}${r.made_of.length ? `<br><span class="small muted">${esc(r.made_of.join(", "))}</span>` : ""}</td>
+              <td class="num">${gbp(r.value)}</td><td>${r.from.map(fromPill).join(" ")}</td></tr>`).join("")}
+            ${s.total ? `<tr class="budget-total"><td>${esc(s.total.label)}</td><td class="num">${gbp(s.total.value)}</td><td></td></tr>` : ""}`).join("")}
+          <tr class="budget-result"><td>${esc(b.result.label)}</td><td class="num">${gbp(b.result.value)}</td><td></td></tr>
+        </tbody></table></div></div>`).join("")}</div>`;
+  }
+
   function renderCase() {
     const c = currentCase, ff = c.factfind;
     // Alerts and items to check are worth knowing, not decisions.
@@ -1591,7 +1626,7 @@
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
     const tabs = [["summary", dot + (act ? "Action required" : check ? "Review recommended" : "No issues found"), act + check],
-                  ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)], ["credit", "Credit report"],
+                  ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)], ["budget", "Budget planner"], ["credit", "Credit report"],
                   ["bank", "Bank transactions", Object.keys(waiting).length],
                   ["sources", "Sources"], ["outputs", "Outputs and audit"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
@@ -1630,6 +1665,8 @@
           <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Approve fact find</button>
           <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
         </div>`)}
+
+      ${panel("budget", budgetHtml(c))}
 
       ${panel("credit", creditHtml(c))}
 
@@ -1681,6 +1718,11 @@
     }));
     document.querySelectorAll("[data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
     document.querySelectorAll("[data-open-credit]").forEach((b) => b.addEventListener("click", openCredit));
+    document.querySelectorAll("#case-view [data-budget]").forEach((b) => b.addEventListener("click", () => {
+      budgetLayout = b.dataset.budget;
+      document.querySelectorAll("#case-view [data-budget]").forEach((x) => x.classList.toggle("active", x === b));
+      document.querySelectorAll("#case-view [data-budget-layout]").forEach((p) => { p.hidden = p.dataset.budgetLayout !== budgetLayout; });
+    }));
     document.querySelectorAll("[data-verify]").forEach((b) => b.addEventListener("click", () => {
       const key = b.dataset.verify, at = new Date().toISOString();
       c.verify = Object.assign({}, c.verify, { [key]: { by: WHO, at: at } });

@@ -585,6 +585,74 @@
       + g.ticks.map((t) => `<text x="${t.x}" y="${g.base}" text-anchor="middle">${t.label}</text>`).join("") + "</svg>";
   }
 
+  // --- the Quilter budget planner (affordability/budgetplanner.py; the two must agree) ----
+  const ORIGIN = { OPEN_BANKING: "Open Banking", CREDIT_FILE: "Credit report", COMPANY_REPORT: "Company report",
+                   CUSTOMER: "Customer", BROKER: "Adviser", HMRC_PAYROLL: "HMRC", HMRC_SA: "HMRC" };
+  function budgetOrigin(p, checkedBy) {
+    p = p || {};
+    if (p.status === "VERIFIED") return checkedBy;
+    const o = p.origin;
+    return ORIGIN[o] || (o ? o.charAt(0) + o.slice(1).toLowerCase().replace(/_/g, " ") : "Customer");
+  }
+  function budgetPlanner(kase, key, layouts, lines) {
+    const spec = layouts[key], data = kase.factfind.data, prov = kase.factfind.provenance;
+    const r2 = (v) => Math.round(v * 100) / 100, money = (v) => r2(v).toFixed(2);
+    const credit = new Set(lines.filter((l) => l.commitment_types.length).map((l) => l.key));
+    const label = Object.fromEntries(lines.map((l) => [l.key, l.label]));
+    // The household's non-pay income in the bank (not a company's).
+    const people = kase.parties.filter((p) => p.role !== "COMPANY").map((p) => p.key);
+    const bank = bankLines(Object.assign({}, kase, { transactions: kase.transactions.filter((t) => people.includes(t.party)),
+      months: Object.fromEntries(Object.entries(kase.months).filter(([k]) => people.includes(k))) })).byCat;
+    const incomeFrom = (ns) => ns.map((n) => { const o = (prov[`applicants[${n}].income.net_monthly`] || {}).origin; return o ? ORIGIN[o] || "Customer" : "Customer"; });
+    const value = (item) => {
+      const s = data.summary || {}, applicants = data.applicants || [];
+      if (item === "gross") return [num(s.gross_annual_income) / 12, ["Fact find"]];
+      if (item === "net") return [num(s.net_monthly_income), incomeFrom(applicants.map((_, n) => n))];
+      if (item.startsWith("net:")) {
+        const n = +item.slice(4);
+        return n < applicants.length ? [num((applicants[n].income || {}).net_monthly), incomeFrom([n])] : [0, []];
+      }
+      if (item.startsWith("bank:")) { const v = bank[item.slice(5)] || 0; return [v, v ? ["Open Banking"] : []]; }
+      const amount = num((data.expenditure || {})[item]);
+      if (!amount) return [0, []];
+      if (credit.has(item)) {
+        const found = (data.commitments || []).map((c, j) => c && creditLineFor(c.type, lines) === item
+          ? budgetOrigin(prov[`commitments[${j}].monthly_payment`], "Credit report") : null).filter(Boolean);
+        return [amount, found.length ? found : ["Credit report"]];
+      }
+      return [amount, [budgetOrigin(prov[`expenditure.${item}`], "Open Banking")]];
+    };
+    const line = (text, items) => {
+      let total = 0; const from = new Set();
+      items.forEach((i) => { const [v, w] = value(i); total += v; if (v) w.forEach((x) => from.add(x)); });
+      return { label: text, value: money(total), from: [...from].sort(),
+               made_of: items.filter((i) => label[i] && num((data.expenditure || {})[i])).map((i) => label[i]) };
+    };
+    const out = { key: key, name: spec.name, note: spec.note, sections: [] };
+    let income;
+    if (key === "quilter") {
+      const [text, after, before] = spec.income[0];
+      const a = line(text, after);
+      out.income = [Object.assign(a, { before_tax: line(text, before).value })];
+      income = num(a.value);
+    } else {
+      out.income = spec.income_lines.map(([text, items]) => line(text, items));
+      income = out.income.reduce((t, r) => t + num(r.value), 0);
+    }
+    out.income_total = money(income);
+    let spent = 0, running = 0;
+    spec.sections.forEach(([title, totalLabel, rows]) => {
+      const done = rows.map(([text, items]) => line(text, items));
+      running += done.reduce((t, r) => t + num(r.value), 0);
+      const section = { title: title, rows: done };
+      if (totalLabel) { section.total = { label: totalLabel, value: money(running) }; spent += running; running = 0; }
+      out.sections.push(section);
+    });
+    out.outgoings_total = money(spent);
+    out.result = { label: spec.result, value: money(income - spent) };
+    return out;
+  }
+
   // --- the C2C Data Pack, as it stands now ------------------------------------------------
   function dataPack(c, lines) {
     const pack = JSON.parse(JSON.stringify(c.pack));
@@ -610,7 +678,7 @@
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
                 bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
                 makeCase, rename, glance, changes, dataPack, bankReport, statement, chart, chartSvg, payer,
-                categoryPath, MONTHS };
+                categoryPath, MONTHS, budgetPlanner };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);
