@@ -443,6 +443,37 @@
   .btn-verify { width: auto; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
                 background: #fff; color: var(--brand); border: 1px solid var(--brand); margin-left: 6px; }
   .statement td { padding-top: 7px; padding-bottom: 7px; }
+  /* The credit report, as the credit file lays it out (cases/base.html) */
+  .cr-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 16px; }
+  .cr-grid.tight { gap: 24px; margin: 8px 0; }
+  @media (max-width: 860px) { .cr-grid { grid-template-columns: 1fr; } }
+  .cr-grid .panel { margin: 0 0 12px; }
+  .cr-title { font-size: 18px; font-weight: 300; color: var(--ink); margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .cr-facts { width: 100%; }
+  .cr-facts th { font-weight: 500; font-size: 11.5px; text-transform: uppercase; color: var(--ink); background: none; width: 46%; text-align: left; }
+  .cr-facts th, .cr-facts td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #eee; }
+  .cr-score { width: 110px; height: 110px; border-radius: 50%; margin: 10px auto 6px; display: flex; align-items: center;
+              justify-content: center; font-size: 32px; color: #fff; }
+  .cr-score.cr-bad { background: #c62f3b; } .cr-score.cr-warn { background: #e0961e; } .cr-score.cr-good { background: var(--teal); }
+  .cr-band.cr-bad { color: #c62f3b; } .cr-band.cr-warn { color: #8a5a06; } .cr-band.cr-good { color: var(--teal-ink); }
+  .cr-snap { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 2px solid #e6e6ea; color: var(--ink); }
+  .cr-snap strong { font-size: 22px; font-weight: 400; }
+  .cr-alert { padding: 6px 0; color: var(--ink); }
+  .cr-icon { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 4px;
+             font-weight: 700; font-size: 12px; margin-right: 6px; }
+  .cr-icon.bad { background: #c62f3b; color: #fff; } .cr-icon.warn { background: #e0961e; color: #fff; }
+  .cr-icon.ok { color: var(--teal-ink); } .cr-icon.none { color: var(--muted); }
+  .cr-account { padding: 0 0 8px; overflow: hidden; }
+  .cr-account > *:not(.cr-bar) { margin-left: 14px; margin-right: 14px; }
+  .cr-bar { background: #7b7b7b; color: #fff; padding: 9px 14px; display: flex; gap: 10px; align-items: center; }
+  .cr-history th, .cr-history td { padding: 5px 6px; text-align: center; font-size: 12px; border: 0; }
+  .cr-history th:first-child, .cr-history td:first-child { text-align: left; white-space: nowrap; }
+  .cr-history tr.cr-year th { border-top: 1px solid #e6e6ea; font-weight: 400; color: var(--ink); background: none; padding-top: 10px; }
+  .cr-code { display: inline-flex; min-width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 4px;
+             font-size: 11px; font-weight: 700; background: rgba(60,184,154,0.18); color: var(--teal-ink); }
+  .cr-c1, .cr-c2, .cr-c3, .cr-c4, .cr-c5, .cr-c6, .cr-cA { background: #f3d9a8; color: #8a5a06; }
+  .cr-cD { background: #c62f3b; color: #fff; } .cr-cS { background: #6fbf73; color: #fff; } .cr-cU { background: #ececef; color: #5f5f66; }
+  .cr-legend { line-height: 2; }
   .statement tr.day td { border-top: 2px solid var(--border); }
   .statement details summary { cursor: pointer; }
   .statement-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
@@ -600,6 +631,9 @@
   <!-- STATEMENT -->
   <div id="statement-view" class="card wide hidden"></div>
 
+  <!-- CREDIT REPORT -->
+  <div id="credit-view" class="card wide hidden"></div>
+
   <!-- TEMPLATES -->
   <div id="templates-view" class="card wide hidden"></div>
 
@@ -721,15 +755,15 @@
 
   // ---- navigation -----------------------------------------------------------------------
   let currentCase = null, banner = "";
-  const VIEWS = ["portal", "case", "statement", "templates", "how"];
-  const TITLES = { portal: "Cases", case: "Cases", statement: "Cases",
+  const VIEWS = ["portal", "case", "statement", "credit", "templates", "how"];
+  const TITLES = { portal: "Cases", case: "Cases", statement: "Cases", credit: "Cases",
                    templates: "Templates", how: "How it works" };
   function showView(view) {
     VIEWS.forEach((v) => $(v + "-view").classList.toggle("hidden", v !== view));
     document.querySelectorAll(".sidebar-link").forEach((b) =>
-      b.classList.toggle("active", b.dataset.view === view || ((view === "case" || view === "statement") && b.dataset.view === "portal")));
+      b.classList.toggle("active", b.dataset.view === view || (["case", "statement", "credit"].includes(view) && b.dataset.view === "portal")));
     $("page-title").textContent = TITLES[view];
-    $("mobile-nav").value = view === "case" || view === "statement" ? "portal" : view;
+    $("mobile-nav").value = ["case", "statement", "credit"].includes(view) ? "portal" : view;
     if (view === "portal") renderPortal();
     if (view === "templates") renderTemplates();
     window.scrollTo(0, 0);
@@ -1191,7 +1225,7 @@
           : h.income.map((x) => row(esc(x.label), x)).join("") + row("Total income", h.incomeTotal, "strong")
             + h.expenditure.map((x) => row(esc(x.label), x)).join("") + row("Total expenditure", h.expenditureTotal, "strong")
             + row('Left over <span class="muted" style="font-weight:400">(income less expenditure)</span>', h.left, "strong");
-        which = `<h3 class="sub-band">Which account does what <span class="muted">· a month, every account added together</span></h3>
+        which = `<h3 class="sub-band">Accountability <span class="muted">· which account does what, a month, every account added together</span></h3>
           <div class="table-wrap"><table><thead><tr><th></th>${h.cols.map((col) => `<th class="num">${esc(col.who)}<br><span class="muted" style="font-weight:400">${esc(col.account)}</span></th>`).join("")}<th class="num">${esc(h.totalLabel)}</th></tr></thead>
           <tbody>${body}</tbody></table></div>`;
       }
@@ -1214,7 +1248,8 @@
     }).join("");
     return `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
       <div class="section-note" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:260px">From the bank statements, laid out as a bank report. Household · all sources adds up every account in the household; pick a person or an account above to see theirs on its own.</span>
-        <button class="btn-primary" data-open-statement style="width:auto;padding:9px 16px;font-size:13px">Statement: every transaction</button></div>${html}</div>`;
+        <button class="btn-primary" data-open-statement style="width:auto;padding:9px 16px;font-size:13px">Open Banking statement</button>
+        <button class="btn-primary" data-open-credit style="width:auto;padding:9px 16px;font-size:13px">Credit report</button></div>${html}</div>`;
   }
 
   // ---- the statement: every transaction, as a page of its own (cases/statement.html) -----------
@@ -1241,7 +1276,7 @@
     $("statement-view").innerHTML = `
       <button class="back-link" id="statement-back">&larr; ${esc(caseTitle(c))}</button>
       <div class="eyebrow muted">${esc(c.reference)}</div>
-      <h1 class="title">STATEMENT</h1>
+      <h1 class="title">OPEN BANKING STATEMENT</h1>
       <p class="subtitle">${esc(caseTitle(c))} · every transaction from the Open Banking, oldest first${first ? `, ${ddmmyyyy(first)} to ${ddmmyyyy(last)}` : ""}. Each balance is the account's balance after that transaction, worked back from its balance today.</p>
       <div class="table-wrap"><table><thead><tr><th>Bank account</th><th>Whose</th><th>Sort code</th><th>Account number</th><th class="num">Balance</th></tr></thead>
         <tbody>${accounts.map((a) => `<tr><td><strong>${esc(a.provider)}</strong> <span class="small muted">${esc(a.kind)}</span></td><td>${esc(a.holder || a.who)}</td>
@@ -1257,12 +1292,14 @@
         <label class="small muted">From <input type="date" id="st-from" value="${esc(stFilters["st-from"] || first)}" min="${first}" max="${last}"></label>
         <label class="small muted">To <input type="date" id="st-to" value="${esc(stFilters["st-to"] || last)}" min="${first}" max="${last}"></label>
         <button class="btn-secondary" id="st-clear">Clear</button>
+        <button class="btn-primary" id="st-pdf">Download PDF</button>
+        <button class="btn-secondary" data-open-credit>Credit report</button>
         <span class="small muted" id="st-count" style="margin-left:auto"></span>
       </div>
       <div class="table-wrap"><table class="statement">
         <thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Type</th><th class="num">Amount</th><th class="num">Balance</th><th></th></tr></thead>
         <tbody id="st-rows">${rows.map((t) => `
-          <tr data-party="${esc(t.party)}" data-account="${esc(t.account || "")}" data-code="${esc(t.code || "")}" data-primary="${esc(t.primary)}"
+          <tr data-id="${esc(t.id)}" data-party="${esc(t.party)}" data-account="${esc(t.account || "")}" data-code="${esc(t.code || "")}" data-primary="${esc(t.primary)}"
               data-date="${esc(t.date)}" data-amount="${esc(t.amount)}" data-search="${esc([t.description, t.primary, t.sub, t.provider].join(" ").toLowerCase())}">
             <td class="st-date" style="white-space:nowrap">${dayLabel(t.date)}</td>
             <td class="small muted" style="white-space:nowrap">${esc(t.who)}<br>${esc(t.accountName)}</td>
@@ -1302,6 +1339,22 @@
     };
     ids.forEach((id) => { if ($(id)) { $(id).addEventListener("input", filter); $(id).addEventListener("change", filter); } });
     $("st-clear").addEventListener("click", () => { stFilters = {}; renderStatement(); });
+    document.querySelectorAll("#statement-view [data-open-credit]").forEach((b) => b.addEventListener("click", openCredit));
+    // The PDF is the statement as filtered here (cases/screens.filter_statement).
+    $("st-pdf").addEventListener("click", () => {
+      const shown = new Set([...document.querySelectorAll("#st-rows tr[data-date]")].filter((r) => r.style.display !== "none")
+        .map((r) => r.dataset.id));
+      const words = [];
+      const person = val("st-person"), account = val("st-account"), code = val("st-code");
+      if (person) words.push((c.parties.find((p) => p.key === person) || {}).name || person);
+      if (account) words.push((rows.find((t) => t.account === account) || {}).accountName || account);
+      if (code) words.push(`type ${code} (${CODES[code] || code})`);
+      if (val("st-category")) words.push(val("st-category"));
+      if (val("st-way")) words.push(val("st-way") === "in" ? "money in" : "money out");
+      if (val("st-search")) words.push(`“${val("st-search")}”`);
+      if ((val("st-from") && val("st-from") > first) || (val("st-to") && val("st-to") < last)) words.push(`${val("st-from") || first} to ${val("st-to") || last}`);
+      downloadStatement(c, rows.filter((t) => shown.has(t.id)), words);
+    });
     $("statement-back").addEventListener("click", () => { showView("case"); renderCase(); });
     document.querySelectorAll("[data-st-change]").forEach((b) => b.addEventListener("click", () => {
       const id = b.dataset.stChange;
@@ -1313,6 +1366,104 @@
     filter();
   }
   function openStatement() { stFilters = {}; showView("statement"); renderStatement(); }
+
+  // ---- the credit report: each person's full credit file (cases/credit.html) ---------------------
+  const CR_GROUPS = [["long", "Long-term loans"], ["short", "Short-term credit"], ["payday", "Payday loans"], ["current", "Current accounts"]];
+  const CR_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  function renderCredit() {
+    // The credit files never change on the page: read from the demo data, not the saved case.
+    const c = currentCase, files = (D.cases.find((d) => d.id === c.id) || {}).credit_files || [];
+    const icon = (level) => `<span class="cr-icon ${level}">${level === "ok" ? "✓" : "!"}</span>`;
+    const facts = (rows) => `<table class="cr-facts">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</table>`;
+    const file = (r) => { const f = r.file; return `<section class="credit-file" data-person="${esc(r.key)}">
+      <div class="cr-grid">
+        <div class="panel"><div class="cr-title">Credit Summary <span class="muted">${esc(f.report_date)}</span></div>
+          ${facts([["Name", f.name || r.who], ["Reference", f.reference || "–"], ["Date of birth", f.date_of_birth || "–"], ["Current address", f.address || "–"], ["Electoral roll", f.electoral_roll]])}</div>
+        <div class="panel" style="text-align:center"><div class="cr-title" style="text-align:left">Credit Score</div>
+          ${f.score ? `<div class="cr-score cr-${f.score.level}">${f.score.value}</div><div class="cr-band cr-${f.score.level}">${esc(f.score.band)}</div>
+            <p class="small muted" style="margin:8px 20px 0">${esc(f.score.text)}</p>` : '<p class="small muted">No score on this report.</p>'}</div>
+      </div>
+      <div class="cr-grid">
+        <div class="panel"><div class="cr-title">Account Snapshot</div>
+          ${f.snapshot.map((s) => `<div class="cr-snap"><span>${s.warn ? icon("bad") : '<span class="cr-icon none">–</span>'} ${esc(s.label)} <span class="muted">(${s.count})</span></span><strong>${gbp(s.amount)}</strong></div>`).join("")}</div>
+        <div><div class="panel"><div class="cr-title">Alerts</div>
+            ${f.alerts.map((a) => `<div class="cr-alert">${icon(a.level)} <a href="#${a.anchor}-${esc(r.key)}">${esc(a.label)}</a></div>`).join("")}</div>
+          <div class="panel"><div class="cr-title">Additional Information</div>
+            ${f.additional.map((a) => `<div class="cr-alert">${icon(a.level)} ${esc(a.label)}</div>`).join("")}</div></div>
+      </div>
+      <h2 id="cr-accounts-${esc(r.key)}">Account history <span class="small muted" style="font-weight:400">· ${esc(r.who)}</span></h2>
+      ${f.accounts.map((a) => `<div class="panel cr-account" data-group="${a.group}" data-status="${esc(a.status)}" data-missed="${a.missed ? "yes" : ""}" data-lender="${esc(a.lender.toLowerCase())}">
+        <div class="cr-bar">${esc(a.lender)} / ${esc(a.number || "–")} – ${esc(a.type)} ${pill(["default", "arrears"].includes(a.status) ? "alert" : a.status === "settled" ? "derived" : "verified", a.status.toUpperCase())}</div>
+        <div class="cr-grid tight">${facts(a.left)}${facts(a.right)}</div>
+        <div class="table-wrap"><table class="cr-history">${a.years.map((y) => `
+          <tr class="cr-year"><th>${y.year}</th>${CR_MONTHS.map((m) => `<th>${m}</th>`).join("")}</tr>
+          <tr><td class="muted">Payment status</td>${y.months.map((m) => `<td>${m.status ? `<span class="cr-code cr-c${m.status}">${m.status}</span>` : ""}</td>`).join("")}</tr>
+          <tr><td class="muted">Statement balance (£)</td>${y.months.map((m) => `<td class="muted">${m.balance === null || m.balance === undefined ? "" : esc(m.balance)}</td>`).join("")}</tr>`).join("")
+          || '<tr><td class="small muted">No payment history on the report.</td></tr>'}</table></div></div>`).join("") || '<div class="panel small">No accounts on the report.</div>'}
+      <p class="small muted cr-legend">${f.codes.map(([k, v]) => `<span class="cr-code cr-c${k}">${k}</span> ${esc(v)}&nbsp;&nbsp; `).join("")}</p>
+      <div class="cr-grid">
+        <div class="panel"><div class="cr-title">Electoral Roll</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Confirmed at present</th><th>On the roll</th></tr></thead>
+          <tbody>${f.electoral.map((e) => `<tr><td>${esc(e.name)}</td><td>${e.current ? "Yes" : "No"}</td><td>${e.from} to ${e.to}</td></tr>`).join("") || `<tr><td colspan="3" class="small muted">${esc(f.electoral_roll)}</td></tr>`}</tbody></table></div></div>
+        <div class="panel"><div class="cr-title">Addresses</div>
+          ${f.addresses.map((a) => `<p style="margin:4px 0"><span class="small muted">${esc(a.label)}</span><br>${esc(a.address)}</p>`).join("")}${f.addresses.length === 1 ? '<p class="small muted" style="margin:4px 0">No linked address.</p>' : ""}
+          <div class="cr-title" style="margin-top:12px">Aliases and associates</div>
+          ${f.aliases.map((a) => `<p style="margin:4px 0">Alias: ${esc(a.name)}</p>`).join("")}${f.associates.map((a) => `<p style="margin:4px 0">Associated with: ${esc(a.name)}</p>`).join("")}
+          ${f.aliases.length || f.associates.length ? "" : '<p class="small muted" style="margin:4px 0">None.</p>'}</div>
+      </div>
+      <h2>Searches</h2>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Company</th><th>Name searched</th><th>Purpose</th><th>Type</th></tr></thead>
+        <tbody>${f.searches.map((s) => `<tr class="cr-search" data-credit="${s.credit ? "credit" : "other"}"><td style="white-space:nowrap">${esc(s.day)}</td><td>${esc(s.company)}</td><td>${esc(s.name)}</td><td>${esc(s.purpose)}</td>
+          <td>${s.credit ? pill("difference", "CREDIT SEARCH") : pill("derived", "OTHER SEARCH")}</td></tr>`).join("") || '<tr><td colspan="5" class="small muted">No searches on the report.</td></tr>'}</tbody></table></div>
+      <div class="cr-grid">
+        <div class="panel" id="cr-courts-${esc(r.key)}"><div class="cr-title">Court and Insolvency</div>
+          ${f.courts.map((x) => `<p style="margin:4px 0"><strong>${esc(label(x.type))}</strong> ${x.amount ? gbp(x.amount) : ""} · ${esc(x.date)} · ${x.satisfied ? pill("derived", "SATISFIED") : pill("alert", "NOT SATISFIED")}</p>`).join("")
+            || '<p class="small muted" style="margin:4px 0">No relevant data exists in this category.</p>'}</div>
+        <div class="panel" id="cr-notices-${esc(r.key)}"><div class="cr-title">Notices of Correction</div>
+          ${f.notices.map((n) => `<p style="margin:4px 0">${esc(n)}</p>`).join("") || '<p class="small muted" style="margin:4px 0">No relevant data exists in this category.</p>'}</div>
+      </div></section>`; };
+    $("credit-view").innerHTML = `
+      <button class="back-link" id="credit-back">&larr; ${esc(caseTitle(c))}</button>
+      <div class="eyebrow muted">${esc(c.reference)}</div>
+      <h1 class="title">CREDIT REPORT</h1>
+      <p class="subtitle">Each person's full credit file, as the credit reference agency supplied it. The fact find's commitments and the adverse credit checks are made from the same report.</p>
+      <div class="statement-filters" style="margin-top:12px">
+        ${files.length > 1 ? `<select id="cr-person"><option value="">Everyone</option>${files.map((r) => `<option value="${esc(r.key)}">${esc(r.who)}</option>`).join("")}</select>` : ""}
+        <select id="cr-group"><option value="">Every type of account</option>${CR_GROUPS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select>
+        <select id="cr-status"><option value="">Any status</option><option value="active">Active</option><option value="settled">Settled</option><option value="default">Default</option><option value="arrears">Arrears</option></select>
+        <label class="small muted"><input type="checkbox" id="cr-missed"> Only accounts with missed payments</label>
+        <input type="text" id="cr-search" placeholder="Search lenders">
+        <select id="cr-searches"><option value="">Every search</option><option value="credit">Credit searches</option><option value="other">Other searches</option></select>
+        <button class="btn-secondary" id="cr-clear">Clear</button>
+        <button class="btn-secondary" data-open-statement>Open Banking statement</button>
+        <span class="small muted" id="cr-count" style="margin-left:auto"></span>
+      </div>
+      ${files.map(file).join("") || '<div class="panel">No credit report on this case.</div>'}
+      <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real credit file.</p>`;
+    const ids = ["cr-person", "cr-group", "cr-status", "cr-missed", "cr-search", "cr-searches"];
+    const val = (id) => $(id) ? ($(id).type === "checkbox" ? $(id).checked : $(id).value) : "";
+    const filter = () => {
+      let shown = 0, all = 0;
+      const words = String(val("cr-search")).toLowerCase().split(/\s+/).filter(Boolean);
+      document.querySelectorAll("#credit-view .credit-file").forEach((f) => {
+        const on = !val("cr-person") || f.dataset.person === val("cr-person");
+        f.style.display = on ? "" : "none";
+        f.querySelectorAll(".cr-account").forEach((a) => {
+          const show = (!val("cr-group") || a.dataset.group === val("cr-group")) && (!val("cr-status") || a.dataset.status === val("cr-status"))
+            && (!val("cr-missed") || a.dataset.missed) && words.every((w) => a.dataset.lender.includes(w));
+          a.style.display = show ? "" : "none";
+          if (on) { all++; if (show) shown++; }
+        });
+        f.querySelectorAll(".cr-search").forEach((s) => { s.style.display = !val("cr-searches") || s.dataset.credit === val("cr-searches") ? "" : "none"; });
+      });
+      $("cr-count").textContent = `${shown} of ${all} accounts`;
+    };
+    ids.forEach((id) => { if ($(id)) { $(id).addEventListener("input", filter); $(id).addEventListener("change", filter); } });
+    $("cr-clear").addEventListener("click", () => { renderCredit(); });
+    $("credit-back").addEventListener("click", () => { showView("case"); renderCase(); });
+    document.querySelectorAll("#credit-view [data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
+    filter();
+  }
+  function openCredit() { showView("credit"); renderCredit(); }
 
   // Each credit report on its own, as it arrived.
   function creditHtml(c) {
@@ -1327,7 +1478,7 @@
           <td class="num">${gbp(a.monthly_payment)}</td><td class="num">${a.credit_limit ? gbp(a.credit_limit) : "–"}</td></tr>`).join("")
           || '<tr><td colspan="6" class="small">No accounts on the report.</td></tr>'}</tbody></table></div>${courts}</div>`;
     }).join("");
-    return reports ? `<div class="section src-group"><h2 id="credit">Credit report</h2>${reports}</div>` : "";
+    return reports ? `<div class="section src-group"><h2 id="credit">Credit report <button class="btn-secondary" data-open-credit style="width:auto;padding:6px 12px;font-size:12.5px;margin-left:8px">Open the full credit report</button></h2>${reports}</div>` : "";
   }
 
   function renderCase() {
@@ -1338,10 +1489,12 @@
     const complete = c.status === "COMPLETE";
     const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-    const sources = c.parties.map((p) => `<div class="detail-block">
-        <div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">· ${esc(p.role.toLowerCase())}</span></div>
-        <div class="source-chips">${p.sources.map((s) => pill("delivered", SOURCE[s] || s)).join("")}
-          ${p.missing.map((s) => pill("missing", (SOURCE[s] || s) + " to come")).join("")}</div></div>`).join("");
+    // Sources, one row each (as the service's Sources table).
+    const sources = `<div class="table-wrap"><table><thead><tr><th>Person</th><th>Role</th><th>Source</th><th>Status</th><th>Received</th></tr></thead><tbody>${
+      c.parties.map((p) => p.sources.map((s, i) => `<tr><td>${i ? "" : `<strong>${esc(p.name)}</strong>`}</td><td class="small muted">${i ? "" : esc(label(p.role))}</td>
+          <td>${esc(SOURCE[s] || s)}${s === "CREDIT" ? ' · <button class="link-button" data-open-credit>view</button>' : s === "OPEN_BANKING" ? ' · <button class="link-button" data-open-statement>statement</button>' : ""}</td>
+          <td>${pill("delivered", "Received")}</td><td class="small muted">${esc(dateLong(c.opened))}</td></tr>`).join("")
+        + p.missing.map((s) => `<tr><td></td><td></td><td>${esc(SOURCE[s] || s)}</td><td>${pill("missing", "To come")}</td><td></td></tr>`).join("")).join("")}</tbody></table></div>`;
 
     // A company account is measured by money in and out, not budget lines,
     // so its transactions are never put to a broker to categorise.
@@ -1388,9 +1541,9 @@
       <p class="case-meta"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span> ${statusPill(c)}
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
       <div class="case-actions">
-        <button class="btn-secondary" data-open-statement>Statement</button>
-        <button class="btn-secondary" id="dl-pack">Download Data Pack</button>
-        <button class="btn-secondary" id="dl-report">Case report (PDF)</button>
+        <button class="btn-secondary" data-open-statement>Open Banking statement</button>
+        <button class="btn-secondary" data-open-credit>Credit report</button>
+        <button class="btn-secondary" id="dl-report">Full report (PDF)</button>
       </div>
       ${summaryHtml(c)}
       ${pickerHtml(c)}
@@ -1426,7 +1579,7 @@
       </div>
 
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
-        <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which. Every transaction, with its balance, category and filters, is on the <button class="link-button" data-open-statement>Statement</button> (${c.transactions.length}).</p>
+        <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which. Every transaction, with its balance, category and filters, is on the <button class="link-button" data-open-statement>Open Banking statement</button> (${c.transactions.length}).</p>
         ${toCategorise || '<div class="panel small">Every transaction is categorised.</div>'}</div>` : ""}
 
       <div class="section" data-src="all"><h2>Outputs</h2>
@@ -1448,6 +1601,7 @@
     $("case-back").addEventListener("click", () => showView("portal"));
     const filterRows = () => {};
     document.querySelectorAll("[data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
+    document.querySelectorAll("[data-open-credit]").forEach((b) => b.addEventListener("click", openCredit));
     document.querySelectorAll("[data-verify]").forEach((b) => b.addEventListener("click", () => {
       const key = b.dataset.verify, at = new Date().toISOString();
       c.verify = Object.assign({}, c.verify, { [key]: { by: WHO, at: at } });
@@ -1489,9 +1643,6 @@
       E.recategorise(state.cases, c, id, cat, remember, WHO, D); save(); renderCase();
     }));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
-    $("dl-pack").addEventListener("click", () =>
-      download(new Blob([JSON.stringify(E.dataPack(c, D.lines), null, 2)], { type: "application/json" }),
-               `${c.reference} C2C Data Pack.json`));
     $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
     document.querySelectorAll("[data-output]").forEach((b) => b.addEventListener("click", () => {
       const o = c.outputs[+b.dataset.output];
@@ -1538,11 +1689,15 @@
     });
   }
 
-  // The case report, laid out as the service's (cases/report.py) and the C2C
+  // The full report, laid out as the service's (cases/report.py) and the C2C
   // bank report: the accounts, the months with the graph, the full
-  // breakdowns, the credit reports and fact find, then the STATEMENT.
-  function downloadReport(c, button) {
-    return withButton(button, "Writing the report…", async () => {
+  // breakdowns, the credit reports and fact find, then the OPEN BANKING
+  // STATEMENT. With ``only`` ({rows, words}), the statement on its own, as
+  // filtered on its page (cases/report.build_statement).
+  function downloadReport(c, button) { return writePdf(c, button, null); }
+  function downloadStatement(c, rows, words) { return writePdf(c, "st-pdf", { rows: rows, words: words }); }
+  function writePdf(c, button, only) {
+    return withButton(button, only ? "Writing the statement…" : "Writing the report…", async () => {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 42, width = W - 2 * M;
@@ -1583,7 +1738,7 @@
 
       // The heading and the case's details.
       doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(...ink);
-      doc.text("Affordability Report (DEMO)", M, y + 12);
+      doc.text(only ? "Open Banking Statement (DEMO)" : "Full Report (DEMO)", M, y + 12);
       // The logo, shrunk first: the file is print size and jsPDF would embed it whole.
       try {
         const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = "logo.png"; });
@@ -1594,7 +1749,7 @@
       y += 40;
       const people = c.parties.filter((p) => p.role !== "COMPANY");
       const dobs = data.applicants.map((a) => a.date_of_birth).filter(Boolean).join(" · ") || "–";
-      const span = (() => { const d = c.transactions.map((t) => t.date).sort(); return d.length ? `${d[0].split("-").reverse().join("/")} - ${d[d.length - 1].split("-").reverse().join("/")}` : "–"; })();
+      const span = (() => { const d = (only ? only.rows : c.transactions).map((t) => t.date).sort(); return d.length ? `${d[0].split("-").reverse().join("/")} - ${d[d.length - 1].split("-").reverse().join("/")}` : "–"; })();
       const half = (width - 24) / 2, top = y;
       const facts = (rows, left) => table(null, rows.map(([k, v]) => [{ content: k, styles: { fontStyle: "bold" } }, v]),
         { left: left, right: W - left - half, tableWidth: half, columns: { 0: { cellWidth: half * 0.42 } } });
@@ -1602,18 +1757,23 @@
              ["Case type", label(c.type)], ["Prepared for", `${D.firm || "ABC Ltd"} · adviser ${WHO}`]], M);
       const after = y; y = top;
       facts([["Report date", now.toLocaleString("en-GB")], ["Case opened", dateLong(c.opened)], ["Transaction date range", span],
-             ["Status", c.status === "COMPLETE" ? "Complete" : "Broker review"]], M + half + 24);
+             ["Status", c.status === "COMPLETE" ? "Complete" : "Broker review"]]
+             .concat(only ? [["Showing", only.words.join("; ") || "Every transaction"]] : []), M + half + 24);
       y = Math.max(after, y) + 4;
 
+      if (!only) {
       // What the adviser needs to know, first.
       section("Summary");
       table(["", "What to know"], flagsFor(c).map((f) => [{ content: FLAG_WORD[f.level], styles: { fontStyle: "bold",
         textColor: f.level === "ACT" ? [163, 15, 63] : f.level === "CHECK" ? [138, 90, 6] : [31, 122, 99] } },
         f.title + (f.detail ? "\n" + f.detail : "")]), { columns: { 0: { cellWidth: 50 } } });
 
+      }
       // The bank accounts, with sort code, number and balance.
-      const accounts = [];
-      c.parties.forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => accounts.push(Object.assign({ who: p.name }, a))));
+      const accounts = [], held = only ? new Set(only.rows.map((t) => t.account)) : null;
+      c.parties.forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => {
+        if (!held || !held.size || held.has(a.id)) accounts.push(Object.assign({ who: p.name }, a));
+      }));
       if (accounts.length) {
         section("Bank Accounts");
         table(["Bank accounts", "Sort code", "Account number", "Balance"], accounts.map((a) => [
@@ -1622,6 +1782,7 @@
           { nums: [3], columns: { 0: { cellWidth: width * 0.46 } } });
       }
 
+      if (!only) {
       // The household (and a company), as the bank report reads one account.
       const drawChart = (g, business) => {
         const k = width / g.w, h = g.h * k;
@@ -1657,7 +1818,7 @@
           h.expenditure.forEach((x) => body.push(row(x.label, x)));
           bold.push(body.length); body.push(row("Total expenditure", h.expenditureTotal));
           bold.push(body.length); body.push(row("Left over (income less expenditure)", h.left));
-          section("Which account does what · a month, every account added together");
+          section("Accountability · which account does what, a month");
           table([""].concat(h.cols.map((col) => `${col.who}\n${col.account}`), [h.totalLabel]), body,
                 { nums: [...Array(h.cols.length + 1).keys()].map((i) => i + 1), bold: bold });
         }
@@ -1740,13 +1901,16 @@
           e.old === null ? "–" : String(e.old), String(e.new)]));
       }
 
+      }
       // The full transaction list, on pages of its own.
-      const rows = statementRows(c);
-      if (rows.length) {
-        doc.addPage(); y = 50;
-        section("STATEMENT");
+      const rows = only ? only.rows : statementRows(c);
+      if (rows.length || only) {
+        if (!only) { doc.addPage(); y = 50; }
+        section("OPEN BANKING STATEMENT");
         doc.setFontSize(7.5); doc.setTextColor(...muted);
-        doc.text("Every transaction from the Open Banking, oldest first. The balance is the account's balance after the transaction, worked back from its balance today.", M, y + 2);
+        const inn = rows.reduce((t, r) => t + Math.max(0, E.num(r.amount)), 0), out = rows.reduce((t, r) => t + Math.max(0, -E.num(r.amount)), 0);
+        const note = doc.splitTextToSize(`${rows.length} transaction${rows.length === 1 ? "" : "s"}, oldest first · money in ${gbp(inn)} · money out ${gbp(out)}. The balance is the account's balance after the transaction, worked back from today's.`, width);
+        doc.text(note, M, y + 2); y += 9 * (note.length - 1);
         doc.setTextColor(...ink); y += 12;
         let last = "";
         table(["Date", "Description", "Account", "Type", "Amount", "Balance"], rows.map((t) => {
@@ -1768,8 +1932,9 @@
         doc.text(`Page ${i} of ${pages}  ·  ${c.reference}  ·  DEMO from fictional test data`, M, H - 24);
         doc.text(`Generated on ${generated}`, W - M, H - 24, { align: "right" });
       }
-      doc.save(`${c.reference} case report.pdf`);
-      made(c, "report", `${c.reference} case report.pdf`, button);
+      if (only) { doc.save(`${c.reference} Open Banking statement.pdf`); return; }
+      doc.save(`${c.reference} full report.pdf`);
+      made(c, "report", `${c.reference} full report.pdf`, button);
     });
   }
 
