@@ -425,6 +425,9 @@
   .source-picker button { width: auto; height: 36px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
                           padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--muted); }
   .pick-row.sub button { height: 32px; font-size: 12.5px; }
+  .source-picker button.pick-name { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+                                    font-weight: 600; color: var(--ink); padding-left: 4px; margin-right: 6px; }
+  .source-picker button.pick-name:hover { color: var(--brand); }
   .source-picker button:hover { color: var(--ink); }
   .source-picker button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
   .case-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
@@ -1101,14 +1104,19 @@
       const own = ((c.accounts[p.key] || {}).accounts || []).map((a) => ["acct:" + a.id, `${a.provider} ${a.account}`, "acct:" + a.id]);
       const packed = c.pack.parties.find((x) => x.key === p.key);
       if (packed && packed.credit) own.push(["credit:" + p.key, "Credit report", "credit:" + p.key]);
-      if (c.parties.length > 1) top.push(["person:" + p.key, p.name, ["person:" + p.key].concat(own.map(([v]) => v)).join(" "), p.key]);
-      rows.push([p.key, p.name, own]);
+      // The name at the start of their row picks everything of theirs again.
+      let value = "all", match = "all";
+      if (c.parties.length > 1) {
+        value = "person:" + p.key; match = ["person:" + p.key].concat(own.map(([v]) => v)).join(" ");
+        top.push([value, p.name, match, p.key]);
+      }
+      rows.push([p.key, p.name, own, value, match]);
     });
     if (top.length + rows.reduce((n, r) => n + r[2].length, 0) < 2) return "";
     const button = (v, n, m, owner) => `<button data-pick="${esc(v)}" data-match="${esc(m)}" data-owner="${esc(owner)}">${esc(n)}</button>`;
     return `<div class="source-picker" data-only="${c.parties.length === 1 ? esc(c.parties[0].key) : ""}">
       <div class="pick-row"><span class="pick-label">Show</span>${top.map(([v, n, m, o]) => button(v, n, m, o)).join("")}</div>
-      ${rows.map(([key, name, own]) => `<div class="pick-row sub" data-sub-of="${esc(key)}" hidden><span class="pick-label">${esc(name)}</span>${own.map(([v, n, m]) => button(v, n, m, key)).join("")}</div>`).join("")}</div>`;
+      ${rows.map(([key, name, own, value, match]) => `<div class="pick-row sub" data-sub-of="${esc(key)}" hidden><button class="pick-name" data-pick="${esc(value)}" data-match="${esc(match)}" data-owner="${esc(key)}" title="Everything for ${esc(name)}">${esc(name)}</button>${own.map(([v, n, m]) => button(v, n, m, key)).join("")}</div>`).join("")}</div>`;
   }
   function applyPick() {
     let chosen = document.querySelector(`#case-view [data-pick="${CSS.escape(pick)}"]`);
