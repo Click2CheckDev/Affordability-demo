@@ -585,7 +585,7 @@
       + g.ticks.map((t) => `<text x="${t.x}" y="${g.base}" text-anchor="middle">${t.label}</text>`).join("") + "</svg>";
   }
 
-  // --- the Quilter budget planner (affordability/budgetplanner.py; the two must agree) ----
+  // --- the budget planner (affordability/budgetplanner.py; the two must agree) ------------
   const ORIGIN = { OPEN_BANKING: "Open Banking", CREDIT_FILE: "Credit report", COMPANY_REPORT: "Company report",
                    CUSTOMER: "Customer", BROKER: "Adviser", HMRC_PAYROLL: "HMRC", HMRC_SA: "HMRC" };
   function budgetOrigin(p, checkedBy) {
@@ -630,7 +630,7 @@
     };
     const out = { key: key, name: spec.name, note: spec.note, sections: [] };
     let income;
-    if (key === "quilter") {
+    if (key === "form") {
       const [text, after, before] = spec.income[0];
       const a = line(text, after);
       out.income = [Object.assign(a, { before_tax: line(text, before).value })];
