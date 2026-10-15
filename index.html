@@ -1626,7 +1626,7 @@
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
     const tabs = [["summary", dot + (act ? "Action required" : check ? "Review recommended" : "No issues found"), act + check],
-                  ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)], ["budget", "Budget planner"], ["credit", "Credit report"],
+                  ["budget", "Budget planner"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)], ["credit", "Credit report"],
                   ["bank", "Bank transactions", Object.keys(waiting).length],
                   ["sources", "Sources"], ["outputs", "Outputs and audit"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
@@ -1656,6 +1656,8 @@
 
       ${panel("summary", summaryHtml(c))}
 
+      ${panel("budget", budgetHtml(c))}
+
       ${panel("income", bankReportHtml(c))}
 
       ${panel("taken", (open.length ? `<div class="section" data-src="all"><h2 id="decide">To decide<span class="count">${plural(blocking(c), "difference")}</span></h2>
@@ -1665,8 +1667,6 @@
           <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Approve fact find</button>
           <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
         </div>`)}
-
-      ${panel("budget", budgetHtml(c))}
 
       ${panel("credit", creditHtml(c))}
 
