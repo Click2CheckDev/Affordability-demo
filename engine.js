@@ -525,6 +525,48 @@
     return [rows("credits"), rows("debits")];
   }
 
+  // Each credit commitment beside what the bank shows paid to that lender a
+  // month (affordability/bankreport.credit_commitments; the two must agree).
+  const CREDIT_CATS = ["CREDIT_CARDS", "CAR_LOAN", "PERSONAL_LOANS", "STUDENT_LOANS", "HIRE_PURCHASE",
+                       "OTHER_LONG_TERM_LOANS", "OTHER_LOANS"];
+  const LENDER_ALIASES = { "AMERICAN EXPRESS": ["AMEX"], "BANK OF SCOTLAND": ["BOS"], "SANTANDER CONSUMER FINANCE": ["SANTANDER"],
+                           "CLOSE BROTHERS": ["CLOSE BROTHERS MOTOR"] };
+  const GENERIC = new Set(["BANK", "FINANCE", "FINANCIAL", "CARD", "CARDS", "LTD", "LIMITED", "PLC", "UK", "CONSUMER", "PERSONAL",
+                           "SERVICES", "BUILDING", "SOCIETY", "CREDIT", "LOANS", "LOAN", "THE", "AND", "MONEY", "MOTOR"]);
+  function lenderWords(lender) {
+    const name = String(lender || "").toUpperCase().replace(/[^A-Z ]/g, " ");
+    const words = name.split(/\s+/).filter((w) => w.length >= 3 && !GENERIC.has(w));
+    return words.concat(LENDER_ALIASES[name.split(/\s+/).filter(Boolean).join(" ")] || []);
+  }
+  function creditLimits(pack) {
+    const out = {};
+    ((pack || {}).parties || []).forEach((p) => ((p.credit || {}).accounts || []).forEach((a) => {
+      if (a.credit_limit) out[`${p.key}|${String(a.lender || "").toUpperCase()}`] = a.credit_limit;
+    }));
+    return out;
+  }
+  function creditCommitments(commitments, txs, months, limits) {
+    const inMonths = new Set(months), n = months.length || 1;
+    const paid = txs.filter((t) => CREDIT_CATS.includes(t.category) && num(t.amount) < 0 && inMonths.has(t.date.slice(0, 7)));
+    const used = new Set(), rows = [];
+    commitments.filter(Boolean).forEach((c) => {
+      const words = lenderWords(c.lender);
+      const mine = paid.filter((t) => !c.owner || t.party === undefined || t.party === c.owner);
+      const hits = mine.filter((t) => words.some((w) => t.description.toUpperCase().includes(w)));
+      hits.forEach((t) => used.add(t.id));
+      const bank = r2(hits.reduce((s, t) => s - num(t.amount), 0) / n);
+      rows.push({ lender: c.lender || "", owner: c.owner || "", who: c.owner_name || "",
+                  type: String(c.type || "").replace(/_/g, " ").toLowerCase().replace(/^./, (x) => x.toUpperCase()),
+                  balance: c.balance, limit: c.credit_limit || (limits || {})[`${c.owner}|${String(c.lender || "").toUpperCase()}`],
+                  monthly: r2(num(c.monthly_payment)).toFixed(2),
+                  bank: hits.length ? bank.toFixed(2) : null });
+    });
+    const other = r2(paid.filter((t) => !used.has(t.id)).reduce((s, t) => s - num(t.amount), 0) / n);
+    const sum = (list) => r2(list.reduce((s, v) => s + num(v), 0)).toFixed(2);
+    return { rows: rows, monthly: sum(rows.map((r) => r.monthly)), bank: sum(rows.filter((r) => r.bank).map((r) => r.bank)),
+             unseen: sum(rows.filter((r) => !r.bank).map((r) => r.monthly)), other: other.toFixed(2) };
+  }
+
   // Every transaction, oldest first, with its account's balance after it,
   // worked back from the account's balance today.
   function statement(txs, balances, paths) {
@@ -678,7 +720,7 @@
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
                 bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
                 makeCase, rename, glance, changes, dataPack, bankReport, statement, chart, chartSvg, payer,
-                categoryPath, MONTHS, budgetPlanner };
+                categoryPath, MONTHS, budgetPlanner, creditCommitments, creditLimits, lenderWords };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -1214,8 +1214,11 @@
       const txs = c.transactions.filter((t) => keys.includes(t.party) && (!account || t.account === account));
       const held = keys.flatMap((k) => ((c.accounts[k] || {}).accounts || []).map((a) => Object.assign({ who: name(k) }, a)))
         .filter((a) => !account || a.id === account);
+      // The credit report's commitments for these people, beside the bank (not for one account).
+      const owed = (c.factfind.data.commitments || []).filter((k) => k && (keys.includes(k.owner) || (!k.owner && src.split(" ")[0] === "all")));
       return { src: src, title: title, accounts: held, business: !!business, household: tables[src] || null,
                verify: keys.length === 1 && !business ? keys[0] : null,
+               credit: owed.length && !account ? E.creditCommitments(owed, txs, span, E.creditLimits(c.pack)) : null,
                report: E.bankReport(txs, span, business, end, D.category_paths) };
     };
     const people = c.parties.filter((p) => p.role !== "COMPANY" && (c.months[p.key] || []).length), out = [];
@@ -1279,7 +1282,15 @@
             <tbody>${rows.map((x) => `<tr><td>${esc(x.primary)}</td><td>${esc(x.sub)}</td><td class="num">${x.n30}</td><td class="num">${gbp(x.v30)}</td><td class="num">${x.n90}</td><td class="num"><strong>${gbp(x.v90)}</strong></td></tr>`).join("")
               || '<tr><td colspan="6" class="small muted">None in the last 90 days.</td></tr>'}</tbody></table></div>`).join("")}</details>`;
       }
-      return `<div class="bank-report" data-src="${esc(b.src)}"><div class="band">${esc(b.title)}</div>${accounts}${overview}${which}${tables}</div>`;
+      const k = b.credit;
+      const credit = k ? `<h3 class="sub-band">Credit commitments <span class="muted">· from the credit report, beside what the bank shows paid</span></h3>
+        <div class="table-wrap"><table><thead><tr><th>Lender</th><th>Whose</th><th>Type</th><th class="num">Balance</th><th class="num">Limit</th><th class="num">Monthly (credit report)</th><th class="num">Paid from the bank a month</th></tr></thead>
+        <tbody>${k.rows.map((r) => `<tr data-src="all person:${esc(r.owner)} credit:${esc(r.owner)}"><td><strong>${esc(r.lender)}</strong></td><td>${esc(r.who)}</td><td>${esc(r.type)}</td>
+          <td class="num">${gbp(r.balance)}</td><td class="num">${r.limit ? gbp(r.limit) : '<span class="muted">–</span>'}</td>
+          <td class="num"><strong>${gbp(r.monthly)}</strong></td><td class="num">${r.bank ? gbp(r.bank) : pill("difference", "NOT SEEN")}</td></tr>`).join("")}
+          <tr class="strong"><td colspan="5">Total credit commitments</td><td class="num">${gbp(k.monthly)}</td><td class="num">${gbp(k.bank)}</td></tr></tbody></table></div>
+        ${k.unseen !== "0.00" || k.other !== "0.00" ? `<p class="small muted" style="margin:6px 14px 0">${k.unseen !== "0.00" ? `${gbp(k.unseen)} a month of commitments is not paid from a connected account: check where it is paid from. ` : ""}${k.other !== "0.00" ? `The bank also shows ${gbp(k.other)} a month to lenders not on the credit report.` : ""}</p>` : ""}` : "";
+      return `<div class="bank-report" data-src="${esc(b.src)}"><div class="band">${esc(b.title)}</div>${accounts}${overview}${which}${credit}${tables}</div>`;
     }).join("");
     return `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
       <p class="section-note">From the bank statements, laid out as a bank report. Household · all sources adds up every account in the household; pick a person or an account in Show to see theirs on its own.</p>${html}</div>`;
