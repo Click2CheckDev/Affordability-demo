@@ -633,7 +633,7 @@
     </div>
     <div class="inline-form" style="margin:0 0 12px">
       <input type="text" id="case-search" placeholder="Search by name or reference" />
-      <select id="case-attention"><option value="">Every case</option><option value="yes">Needs attention</option><option value="no">All clear</option></select>
+      <select id="case-attention"><option value="">Every case</option><option value="yes">Needs attention</option><option value="no">No issues found</option></select>
       <select id="case-state"><option value="">Any status</option><option value="REVIEW">Broker review</option><option value="COMPLETE">Complete</option></select>
       <select id="case-type"><option value="">Residential and commercial</option><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select>
       <span class="small muted" id="case-count"></span>
@@ -814,7 +814,7 @@
         <td><strong>${esc(caseTitle(c))}</strong><br><span class="small muted"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span>
           <span style="white-space:nowrap">${esc(c.reference)}</span>${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}
           <br>${accounts} account${accounts === 1 ? "" : "s"} · ${credit} credit report${credit === 1 ? "" : "s"} · opened ${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</span></td>
-        <td style="min-width:220px">${statusPill(c)}<div style="margin-top:4px">${attention.slice(0, 3).map((f) => `<div class="small" style="margin:2px 0;color:var(--ink)">${flagPill(f.level)} ${esc(f.title)}</div>`).join("") || flagPill("OK").replace(">OK<", ">All clear<")}${attention.length > 3 ? `<div class="small muted">and ${attention.length - 3} more</div>` : ""}</div></td>
+        <td style="min-width:220px">${statusPill(c)}<div style="margin-top:4px">${attention.slice(0, 3).map((f) => `<div class="small" style="margin:2px 0;color:var(--ink)">${flagPill(f.level)} ${esc(f.title)}</div>`).join("") || flagPill("OK").replace(">OK<", ">No issues found<")}${attention.length > 3 ? `<div class="small muted">and ${attention.length - 3} more</div>` : ""}</div></td>
         <td class="num">${gbp(s.net_monthly_income)}</td>
         <td class="num">${gbp(s.monthly_expenditure)}</td>
         <td class="num"><strong>${gbp(s.disposable_monthly)}</strong></td>
@@ -884,21 +884,6 @@
       "</optgroup>").join("") + "</select>";
   }
 
-  function glanceHtml(c) {
-    const g = E.glance(c);
-    return `<div class="section"><h2>At a glance</h2>
-      <div class="stat-row four">
-        <div class="stat-box brand"><div class="stat-value money">${gbp(g.disposable)}</div><div class="stat-label">Disposable a month</div>
-          <div class="stat-sub">net pay less outgoings</div></div>
-        <div class="stat-box"><div class="stat-value money">${gbp(g.outgoings)}</div><div class="stat-label">Outgoings a month</div>
-          <div class="stat-sub">on the expenditure form</div></div>
-        <div class="stat-box teal"><div class="stat-value">${g.backed}<span style="font-size:18px;color:var(--muted)"> / ${g.total}</span></div><div class="stat-label">Figures backed by a report</div>
-          <div class="stat-sub">confirmed, replaced or added from a report</div></div>
-        <div class="stat-box"><div class="stat-value">${g.differences}</div><div class="stat-label">Differences open</div>
-          <div class="stat-sub">${g.alerts ? `${g.alerts} alert${g.alerts > 1 ? "s" : ""} to read` : "no alerts"}</div></div>
-      </div></div>`;
-  }
-
   function bankingHtml(c) {
     return Object.entries(c.accounts).map(([party, acc]) => {
       const p = c.parties.find((x) => x.key === party) || {};
@@ -919,15 +904,7 @@
           <div><div class="detail-label">After merging</div><ul>${acc.accounts.map((x) => `<li>${esc(x.provider)} ${esc(x.account)} (${esc(x.kind)}) — ${plural(x.transactions, "transaction")}${x.money_in ? `<br><span class="small muted">${gbp(x.money_in)} in / ${gbp(x.money_out)} out a month</span>` : ""}</li>`).join("")}</ul></div>
         </div>
         <p class="small" style="margin:8px 0 0">${plural(steps.accounts_connected || 0, "connection")} → ${plural(steps.accounts_after_merge || 0, "account")} · ${steps.duplicates_removed || 0} duplicates removed · ${steps.transfers_paired || 0} own transfers paired${waiting ? ` · ${waiting} to categorise` : ""}</p>
-        <div class="table-wrap" style="margin-top:12px"><table>
-          <thead><tr><th>Average a month</th><th class="num">£</th></tr></thead>
-          <tbody>
-            ${income.map((k) => `<tr><td>${esc(CAT[k])} <span class="small">(in)</span></td><td class="num">${gbp(bank.byCat[k])}</td></tr>`).join("")}
-            ${lines.map((l) => `<tr><td>${esc(l.label)}</td><td class="num">${gbp(bank.lines[l.key])}</td></tr>`).join("")}
-            ${credit.map((l) => `<tr><td>${esc(l.label)} <span class="small">(checked against the credit report)</span></td><td class="num">${gbp(bank.lines[l.key])}</td></tr>`).join("")}
-            ${bank.byCat.CASH || bank.byCat.UNALLOCATED ? `<tr><td>Cash and general spending <span class="small">(no line on the form)</span></td><td class="num">${gbp((bank.byCat.CASH || 0) + (bank.byCat.UNALLOCATED || 0))}</td></tr>` : ""}
-            ${packed.monthly_credits ? `<tr><td class="muted">All money in / out</td><td class="num muted">${gbp(packed.monthly_credits)} / ${gbp(packed.monthly_debits)}</td></tr>` : ""}
-          </tbody></table></div></div>`;
+        </div>`;
     }).join("");
   }
 
@@ -989,7 +966,7 @@
       if (value === null || value === undefined) value = "";
       if (kind === "money" && value !== "") value = gbp(value);
       const p = prov[path] || {};
-      const salary = /^applicants\[(\d+)\]\.income\.(basic_salary|self_employed_profit)$/.exec(path);
+      const salary = /^applicants\[(\d+)\]\.income\.(?!total$)\w+$/.exec(path);
       return { label: label, path: path, value: String(value), origin: p.origin || "", status: p.status || "",
                said: said[path] || "", src: tokensFor(c, idx, path, p.origin || "", p.status || ""),
                verify: salary && data.applicants[+salary[1]] ? data.applicants[+salary[1]].key : null };
@@ -1028,7 +1005,7 @@
     const taken = c.findings.filter((f) => f.decision && f.decision.default);
     const income = num(s.net_monthly_income), out = [];
     const pct = (part, whole) => whole ? `${Math.round(part / whole * 100)}%` : "–";
-    const flag = (level, title, detail, anchor) => out.push({ level: level, title: title, detail: detail || "", anchor: anchor || "" });
+    const flag = (level, title, detail, anchor, verify) => out.push({ level: level, title: title, detail: detail || "", anchor: anchor || "", verify: verify || "" });
     const left = num(s.disposable_monthly);
     const money = `Net income ${gbp(income)}, outgoings ${gbp(s.monthly_expenditure)}.`;
     if (left < 0) flag("ACT", `Spends more than comes in: ${gbp(left)} a month`, money, "income");
@@ -1071,28 +1048,30 @@
            "Taken from the reports instead: " + outgoings.map((f) => `${label(f.path)} ${gbp(f.declared)} → ${gbp(f.proposed)}`).join(", ") + ".", "taken");
     }
     const earnings = taken.filter((f) => /^(company\.|applicants\[)/.test(f.path) && num(f.proposed) < num(f.declared));
-    earnings.forEach((f) => flag("CHECK", `Customer overstated ${f.path.startsWith("company.") ? "turnover" : "income"} by ${gbp(num(f.declared) - num(f.proposed))}`, f.message, "taken"));
+    earnings.forEach((f) => flag("CHECK", `Customer overstated ${f.path.startsWith("company.") ? "turnover" : "income"} by ${gbp(num(f.declared) - num(f.proposed))}`, f.message, "taken",
+                                 f.path.startsWith("company.") ? "" : f.party));
     if (!undisclosed.length && !outgoings.length && !earnings.length && c.findings.length) flag("OK", "Nothing hidden or understated by the customer", "", "taken");
     const deciding = open.filter((f) => f.outcome === "DIFFERENCE");
     if (deciding.length) flag("ACT", `${deciding.length} difference${deciding.length > 1 ? "s" : ""} to decide`, deciding[0].message, "decide");
     open.forEach((f) => {
       if (f.path.endsWith(".self_employed_profit")) flag("CHECK", "Self-employed profit needs the SA302 to check",
-        `${gbp(f.evidence)} a year arrives in the bank; Open Banking can't show profit.`, "decide");
+        `${gbp(f.evidence)} a year arrives in the bank; Open Banking can't show profit.`, "taken", f.party);
       else if (f.path.endsWith(".uncategorised")) flag("CHECK", `Transactions not yet categorised (${gbp(f.evidence)} out)`, f.message, "transactions");
-      else if (f.outcome === "UNVERIFIABLE") flag("CHECK", f.message.split(". ")[0].replace(/\.$/, "") + ".", "", "decide");
-      else if (f.outcome === "ALERT" && !adverse.includes(f) && f !== gambling) flag("CHECK", f.message, "", "decide");
+      else if (f.outcome === "UNVERIFIABLE") flag("CHECK", f.message.split(". ")[0].replace(/\.$/, "") + ".", "", "taken",
+                                                  /^applicants\[/.test(f.path) && f.path.includes(".income") ? f.party : "");
+      else if (f.outcome === "ALERT" && !adverse.includes(f) && f !== gambling) flag("CHECK", f.message, "", "taken");
     });
     return out.sort((a, b) => FLAG_ORDER[a.level] - FLAG_ORDER[b.level]);
   }
-  const FLAG_WORD = { ACT: "Act", CHECK: "Check", OK: "OK" };
+  const FLAG_WORD = { ACT: "Action", CHECK: "Review", OK: "OK" };
   const flagPill = (level) => `<span class="flag flag-${level}">${FLAG_WORD[level]}</span>`;
   function summaryHtml(c) {
     const found = flagsFor(c), act = found.some((f) => f.level === "ACT"), check = found.some((f) => f.level === "CHECK");
     const s = c.factfind.data.summary || {}, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
     return `<div class="panel summary-panel ${act ? "act" : check ? "check" : "ok"}">
-      <strong>${act ? "Needs action" : check ? "Worth a check" : "All clear"}</strong>
-      <span class="small muted">· ${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month</span>
-      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor ? `<a href="#${f.anchor}" data-flag-link>${esc(f.title)}</a>` : esc(f.title)}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
+      <strong>${act ? "Action required" : check ? "Review recommended" : "No issues found"}</strong>
+      <span class="small muted">· ${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month · ${E.glance(c).backed} of ${E.glance(c).total} figures from the reports</span>
+      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor ? `<a href="#${f.anchor}" data-flag-link>${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
   }
 
   // The Show bar in two rows (cases/screens.picker): the household and each
@@ -1292,9 +1271,7 @@
       return `<div class="bank-report" data-src="${esc(b.src)}"><div class="band">${esc(b.title)}</div>${accounts}${overview}${which}${tables}</div>`;
     }).join("");
     return `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
-      <div class="section-note" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span style="flex:1;min-width:260px">From the bank statements, laid out as a bank report. Household · all sources adds up every account in the household; pick a person or an account above to see theirs on its own.</span>
-        <button class="btn-primary" data-open-statement style="width:auto;padding:9px 16px;font-size:13px">Open Banking statement</button>
-        <button class="btn-primary" data-open-credit style="width:auto;padding:9px 16px;font-size:13px">Credit report</button></div>${html}</div>`;
+      <p class="section-note">From the bank statements, laid out as a bank report. Household · all sources adds up every account in the household; pick a person or an account in Show to see theirs on its own.</p>${html}</div>`;
   }
 
   // ---- the statement: every transaction, as a page of its own (cases/statement.html) -----------
@@ -1563,8 +1540,8 @@
   function creditHtml(c) {
     // Each person's full credit file, as the Credit report button shows it.
     const files = (D.cases.find((d) => d.id === c.id) || {}).credit_files || [];
-    return files.length ? `<div class="section src-group"><h2 id="credit">Credit report <button class="btn-secondary" data-open-credit style="width:auto;padding:6px 12px;font-size:12.5px;margin-left:8px">Filter or download</button></h2>
-      <p class="section-note">Each person's full credit file, as the credit reference agency supplied it. The Credit report page has the same with filters and a PDF.</p>
+    return files.length ? `<div class="section src-group"><h2 id="credit">Credit report</h2>
+      <p class="section-note">Each person's full credit file, as the credit reference agency supplied it. Credit report, above, has the same with filters and a PDF.</p>
       ${files.map(creditFileHtml).join("")}</div>` : "";
   }
 
@@ -1572,16 +1549,16 @@
     const c = currentCase, ff = c.factfind;
     // Alerts and items to check are worth knowing, not decisions.
     const open = openFindings(c).filter((f) => f.outcome === "DIFFERENCE");
-    const notes = openFindings(c).filter((f) => f.outcome !== "DIFFERENCE");
     const complete = c.status === "COMPLETE";
     const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
     // Sources, one row each (as the service's Sources table).
     const sources = `<div class="table-wrap"><table><thead><tr><th>Person</th><th>Role</th><th>Source</th><th>Status</th><th>Received</th></tr></thead><tbody>${
       c.parties.map((p) => p.sources.map((s, i) => `<tr><td>${i ? "" : `<strong>${esc(p.name)}</strong>`}</td><td class="small muted">${i ? "" : esc(label(p.role))}</td>
-          <td>${esc(SOURCE[s] || s)}${s === "CREDIT" ? ' · <button class="link-button" data-open-credit>view</button>' : s === "OPEN_BANKING" ? ' · <button class="link-button" data-open-statement>statement</button>' : ""}</td>
+          <td>${esc(SOURCE[s] || s)}</td>
           <td>${pill("delivered", "Received")}</td><td class="small muted">${esc(dateLong(c.opened))}</td></tr>`).join("")
-        + p.missing.map((s) => `<tr><td></td><td></td><td>${esc(SOURCE[s] || s)}</td><td>${pill("missing", "To come")}</td><td></td></tr>`).join("")).join("")}</tbody></table></div>`;
+        + p.missing.map((s) => `<tr><td></td><td></td><td>${esc(SOURCE[s] || s)}</td><td>${pill("missing", "To come")}</td><td></td></tr>`).join("")
+        + (p.role !== "COMPANY" ? `<tr><td></td><td></td><td>HMRC · income</td><td>${verifyHtml(c, p.key)}</td><td></td></tr>` : "")).join("")}</tbody></table></div>`;
 
     // A company account is measured by money in and out, not budget lines,
     // so its transactions are never put to a broker to categorise.
@@ -1613,14 +1590,12 @@
     // Tabs: one part of the case at a time (as the service's case page).
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
-    const tabs = [["summary", dot + (act ? "Needs action" : check ? "Worth a check" : "All clear"), act + check],
-                  ["income", "Income and expenditure"], ["taken", "Fact find"], ["credit", "Credit report"],
-                  ["decide", "To decide", blocking(c)], ["bank", "Bank transactions", Object.keys(waiting).length],
+    const tabs = [["summary", dot + (act ? "Action required" : check ? "Review recommended" : "No issues found"), act + check],
+                  ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)], ["credit", "Credit report"],
+                  ["bank", "Bank transactions", Object.keys(waiting).length],
                   ["sources", "Sources"], ["outputs", "Outputs and audit"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
     const panel = (key, html) => `<section class="tab-panel" data-tab="${key}"${key === caseTab ? "" : " hidden"}>${html}</section>`;
-    const decided = c.findings.filter((f) => f.decision && !f.decision.default && f.decision.kind !== "RESOLVED");
-    const matches = c.findings.filter((f) => f.outcome === "MATCH");
     const audit = ff.audit.slice().reverse().map((e) => `
       <tr><td class="mono">${esc(String(e.at).slice(0, 16).replace("T", " "))}</td><td>${esc(e.by)}</td>
         <td title="${esc(e.path)}">${esc(/^(applicants|expenditure|commitments|company)/.test(e.path) ? fieldLabel(e.path, c) : e.path)}</td><td class="num">${esc(e.old === null ? "–" : e.old)}</td>
@@ -1644,38 +1619,27 @@
       <div class="case-bar">${pickerHtml(c)}
         <nav class="case-tabs">${tabs.map(([key, name, count]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count">${count}</span>` : ""}</button>`).join("")}</nav></div>
 
-      ${panel("summary", summaryHtml(c) + `<div data-src="all">${glanceHtml(c)}</div>`)}
+      ${panel("summary", summaryHtml(c))}
 
       ${panel("income", bankReportHtml(c))}
 
-      ${panel("taken", takenHtml(c))}
+      ${panel("taken", (open.length ? `<div class="section" data-src="all"><h2 id="decide">To decide<span class="count">${plural(blocking(c), "difference")}</span></h2>
+        <p class="section-note">There is no figure to take for these: use the source's, or keep what was entered with a reason.</p>
+        ${open.map(findingHtml).join("")}</div>` : "") + takenHtml(c) + `
+        <div class="inline-form" data-src="all">
+          <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Approve fact find</button>
+          <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
+        </div>`)}
 
       ${panel("credit", creditHtml(c))}
 
-      <section class="tab-panel" data-tab="decide"${caseTab === "decide" ? "" : " hidden"}>
-      <div class="section" data-src="all"><h2 id="decide">To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
-        ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
-        ${notes.length ? `<h3 style="margin:18px 0 8px;font-size:15px;font-weight:500">Worth knowing</h3>${notes.map((f) => `<div class="panel finding ${f.outcome.toLowerCase()}">
-          <div class="finding-head">${pill(f.outcome.toLowerCase(), OUTCOME[f.outcome] || f.outcome)}<span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
-          <div class="finding-text">${esc(f.message)}</div></div>`).join("")}` : ""}
-        ${decided.length ? `<details class="payments-detail"><summary>Decided (${decided.length})</summary>
-          ${decided.map((f) => `<div class="detail-block"><div class="detail-block-header">${f.decision.kind === "ACCEPT" ? "Accepted" : "Kept entered"} · ${esc(f.decision.by)}</div>
-            <div class="small">${esc(f.message)}${f.decision.reason ? `<br><em>“${esc(f.decision.reason)}”</em>` : ""}</div></div>`).join("")}</details>` : ""}
-        ${matches.length ? `<details class="payments-detail"><summary>Confirmed by a source (${matches.length})</summary>
-          ${matches.map((f) => `<div class="row"><span class="label">${esc(SOURCE[f.source] || f.source)}</span><span class="value" style="font-weight:400">${esc(f.message)}</span></div>`).join("")}</details>` : ""}
-        <div class="inline-form">
-          <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Approve fact find</button>
-          <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
-        </div>
-      </div>
-      </section>
 
       <section class="tab-panel" data-tab="bank"${caseTab === "bank" ? "" : " hidden"}>
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
         <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which. Every transaction, with its balance, category and filters, is on the <button class="link-button" data-open-statement>Open Banking statement</button> (${c.transactions.length}).</p>
         ${toCategorise || '<div class="panel small">Every transaction is categorised.</div>'}</div>` : ""}
-      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
-        <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
+      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>How the accounts were put together<span class="count">one per person or company</span></h2>
+        <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired.</p>
         ${bankingHtml(c)}</div>` : ""}
       </section>
 
