@@ -414,8 +414,19 @@
   .btn-primary:disabled, .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
   .money { font-variant-numeric: tabular-nums; }
   .case-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 16px; }
-  .source-picker { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
-                   background: var(--surface, #fff); padding: 10px 0; margin: 0 0 8px; border-bottom: 1px solid var(--border); }
+  /* The Show picker and the case's tabs stay at the top of the screen. */
+  #case-view.card.wide { overflow: visible; }
+  .case-bar { position: sticky; top: 0; z-index: 6; background: #fff; margin: 8px 0 14px; padding-top: 8px; border-bottom: 1px solid var(--border); }
+  .source-picker { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 0 8px; }
+  .case-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+  .case-tabs button { width: auto; height: 36px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
+                      padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  .case-tabs button:hover { color: var(--ink); }
+  .case-tabs button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
+  .case-tabs .count { font-size: 11px; background: #ececef; border-radius: 999px; padding: 1px 7px; font-weight: 500; }
+  .case-tabs .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .case-tabs .dot.act { background: var(--brand); } .case-tabs .dot.check { background: #e0961e; } .case-tabs .dot.ok { background: var(--teal); }
+  #case-view [id] { scroll-margin-top: 110px; }
   .source-picker button { width: auto; padding: 6px 12px; font-size: 12.5px; }
   .src-off { display: none !important; }
   /* The bank report, laid out as the C2C bank report is (cases/_bank_report.html) */
@@ -750,7 +761,7 @@
   const CODES = { BGC: "Bank giro credit", BP: "Bill payment", CHG: "Charge", CHQ: "Cheque", CPT: "Cash machine",
                   DD: "Direct debit", DEB: "Debit card", DEP: "Deposit", FPI: "Faster payment in",
                   FPO: "Faster payment out", SO: "Standing order", TFR: "Transfer" };
-  let pick = "all";
+  let pick = "all", caseTab = "summary";
   const dateLong = (d) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // ---- navigation -----------------------------------------------------------------------
@@ -818,7 +829,7 @@
 
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
-    if (currentCase !== c) pick = "all";
+    if (currentCase !== c) { pick = "all"; caseTab = "summary"; }
     currentCase = c;
     showView("case"); renderCase();
   }
@@ -1373,6 +1384,8 @@
   function renderCredit() {
     // The credit files never change on the page: read from the demo data, not the saved case.
     const c = currentCase, files = (D.cases.find((d) => d.id === c.id) || {}).credit_files || [];
+    const first = files.map((r) => r.file.first).filter(Boolean).sort()[0] || "";
+    const last = files.map((r) => r.file.last).sort().slice(-1)[0] || "";
     const icon = (level) => `<span class="cr-icon ${level}">${level === "ok" ? "✓" : "!"}</span>`;
     const facts = (rows) => `<table class="cr-facts">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</table>`;
     const file = (r) => { const f = r.file; return `<section class="credit-file" data-person="${esc(r.key)}">
@@ -1392,7 +1405,7 @@
             ${f.additional.map((a) => `<div class="cr-alert">${icon(a.level)} ${esc(a.label)}</div>`).join("")}</div></div>
       </div>
       <h2 id="cr-accounts-${esc(r.key)}">Account history <span class="small muted" style="font-weight:400">· ${esc(r.who)}</span></h2>
-      ${f.accounts.map((a) => `<div class="panel cr-account" data-group="${a.group}" data-status="${esc(a.status)}" data-missed="${a.missed ? "yes" : ""}" data-lender="${esc(a.lender.toLowerCase())}">
+      ${f.accounts.map((a) => `<div class="panel cr-account" data-id="${esc(a.id)}" data-group="${a.group}" data-status="${esc(a.status)}" data-missed="${a.missed ? "yes" : ""}" data-lender="${esc(a.lender.toLowerCase())}" data-start="${esc(a.start)}" data-end="${esc(a.end)}">
         <div class="cr-bar">${esc(a.lender)} / ${esc(a.number || "–")} – ${esc(a.type)} ${pill(["default", "arrears"].includes(a.status) ? "alert" : a.status === "settled" ? "derived" : "verified", a.status.toUpperCase())}</div>
         <div class="cr-grid tight">${facts(a.left)}${facts(a.right)}</div>
         <div class="table-wrap"><table class="cr-history">${a.years.map((y) => `
@@ -1402,8 +1415,8 @@
           || '<tr><td class="small muted">No payment history on the report.</td></tr>'}</table></div></div>`).join("") || '<div class="panel small">No accounts on the report.</div>'}
       <p class="small muted cr-legend">${f.codes.map(([k, v]) => `<span class="cr-code cr-c${k}">${k}</span> ${esc(v)}&nbsp;&nbsp; `).join("")}</p>
       <div class="cr-grid">
-        <div class="panel"><div class="cr-title">Electoral Roll</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Confirmed at present</th><th>On the roll</th></tr></thead>
-          <tbody>${f.electoral.map((e) => `<tr><td>${esc(e.name)}</td><td>${e.current ? "Yes" : "No"}</td><td>${e.from} to ${e.to}</td></tr>`).join("") || `<tr><td colspan="3" class="small muted">${esc(f.electoral_roll)}</td></tr>`}</tbody></table></div></div>
+        <div class="panel"><div class="cr-title">Electoral Roll</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Address</th><th>At present</th><th>On the roll</th></tr></thead>
+          <tbody>${f.electoral.map((e) => `<tr><td>${esc(e.name)}</td><td class="small muted">${esc(e.address || "")}</td><td>${e.current ? "Yes" : "No"}</td><td style="white-space:nowrap">${e.from} to ${e.to}</td></tr>`).join("") || `<tr><td colspan="4" class="small muted">${esc(f.electoral_roll)}</td></tr>`}</tbody></table></div></div>
         <div class="panel"><div class="cr-title">Addresses</div>
           ${f.addresses.map((a) => `<p style="margin:4px 0"><span class="small muted">${esc(a.label)}</span><br>${esc(a.address)}</p>`).join("")}${f.addresses.length === 1 ? '<p class="small muted" style="margin:4px 0">No linked address.</p>' : ""}
           <div class="cr-title" style="margin-top:12px">Aliases and associates</div>
@@ -1427,43 +1440,75 @@
       <h1 class="title">CREDIT REPORT</h1>
       <p class="subtitle">Each person's full credit file, as the credit reference agency supplied it. The fact find's commitments and the adverse credit checks are made from the same report.</p>
       <div class="statement-filters" style="margin-top:12px">
-        ${files.length > 1 ? `<select id="cr-person"><option value="">Everyone</option>${files.map((r) => `<option value="${esc(r.key)}">${esc(r.who)}</option>`).join("")}</select>` : ""}
-        <select id="cr-group"><option value="">Every type of account</option>${CR_GROUPS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select>
-        <select id="cr-status"><option value="">Any status</option><option value="active">Active</option><option value="settled">Settled</option><option value="default">Default</option><option value="arrears">Arrears</option></select>
-        <label class="small muted"><input type="checkbox" id="cr-missed"> Only accounts with missed payments</label>
         <input type="text" id="cr-search" placeholder="Search lenders">
+        ${files.length > 1 ? `<select id="cr-person"><option value="">Everyone</option>${files.map((r) => `<option value="${esc(r.key)}">${esc(r.who)}</option>`).join("")}</select>` : ""}
+        <select id="cr-account"><option value="">Every account</option>${files.flatMap((r) => r.file.accounts.map((a) => `<option value="${esc(r.key)}:${esc(a.id)}">${esc(r.who)} · ${esc(a.lender)} ${esc((a.number || "").slice(-4))}</option>`)).join("")}</select>
+        <select id="cr-group"><option value="">Every type</option>${CR_GROUPS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select>
+        <select id="cr-status"><option value="">Any status</option><option value="active">Active</option><option value="settled">Settled</option><option value="default">Default</option><option value="arrears">Arrears</option></select>
+        <select id="cr-record"><option value="">Any payment record</option><option value="missed">Missed payments</option><option value="clean">Always paid on time</option></select>
         <select id="cr-searches"><option value="">Every search</option><option value="credit">Credit searches</option><option value="other">Other searches</option></select>
+        <label class="small muted">From <input type="date" id="cr-from" value="${first}" min="${first}" max="${last}"></label>
+        <label class="small muted">To <input type="date" id="cr-to" value="${last}" min="${first}" max="${last}"></label>
         <button class="btn-secondary" id="cr-clear">Clear</button>
+        <button class="btn-primary" id="cr-pdf">Download PDF</button>
         <button class="btn-secondary" data-open-statement>Open Banking statement</button>
         <span class="small muted" id="cr-count" style="margin-left:auto"></span>
       </div>
       ${files.map(file).join("") || '<div class="panel">No credit report on this case.</div>'}
       <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real credit file.</p>`;
-    const ids = ["cr-person", "cr-group", "cr-status", "cr-missed", "cr-search", "cr-searches"];
-    const val = (id) => $(id) ? ($(id).type === "checkbox" ? $(id).checked : $(id).value) : "";
+    const ids = ["cr-search", "cr-person", "cr-account", "cr-group", "cr-status", "cr-record", "cr-searches", "cr-from", "cr-to"];
+    const val = (id) => $(id) ? $(id).value : "";
+    const params = () => ({ q: val("cr-search"), person: val("cr-person"), account: val("cr-account"), group: val("cr-group"),
+                            status: val("cr-status"), record: val("cr-record"), searches: val("cr-searches"),
+                            from: val("cr-from") === first ? "" : val("cr-from"), to: val("cr-to") === last ? "" : val("cr-to") });
     const filter = () => {
-      let shown = 0, all = 0;
-      const words = String(val("cr-search")).toLowerCase().split(/\s+/).filter(Boolean);
+      const shown = filterCredit(files, params()).files;
+      let count = 0, all = 0;
       document.querySelectorAll("#credit-view .credit-file").forEach((f) => {
-        const on = !val("cr-person") || f.dataset.person === val("cr-person");
-        f.style.display = on ? "" : "none";
+        const mine = shown.find((r) => r.key === f.dataset.person);
+        f.style.display = mine ? "" : "none";
+        const ids = new Set(mine ? mine.file.accounts.map((a) => a.id) : []);
         f.querySelectorAll(".cr-account").forEach((a) => {
-          const show = (!val("cr-group") || a.dataset.group === val("cr-group")) && (!val("cr-status") || a.dataset.status === val("cr-status"))
-            && (!val("cr-missed") || a.dataset.missed) && words.every((w) => a.dataset.lender.includes(w));
-          a.style.display = show ? "" : "none";
-          if (on) { all++; if (show) shown++; }
+          a.style.display = ids.has(a.dataset.id) ? "" : "none";
+          if (mine) { all++; if (ids.has(a.dataset.id)) count++; }
         });
         f.querySelectorAll(".cr-search").forEach((s) => { s.style.display = !val("cr-searches") || s.dataset.credit === val("cr-searches") ? "" : "none"; });
       });
-      $("cr-count").textContent = `${shown} of ${all} accounts`;
+      $("cr-count").textContent = `${count} of ${all} accounts`;
     };
     ids.forEach((id) => { if ($(id)) { $(id).addEventListener("input", filter); $(id).addEventListener("change", filter); } });
     $("cr-clear").addEventListener("click", () => { renderCredit(); });
+    // The PDF is the credit report as filtered here (cases/report.build_credit).
+    $("cr-pdf").addEventListener("click", () => { const r = filterCredit(files, params()); downloadCredit(c, r.files, r.words); });
     $("credit-back").addEventListener("click", () => { showView("case"); renderCase(); });
     document.querySelectorAll("#credit-view [data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
     filter();
   }
   function openCredit() { showView("credit"); renderCredit(); }
+
+  // The credit reports with only the accounts and searches that match, and
+  // the filters in words (affordability/creditfile.filter_files).
+  function filterCredit(files, v) {
+    const q = (v.q || "").toLowerCase().split(/\s+/).filter(Boolean);
+    const out = files.filter((r) => !v.person || r.key === v.person).map((r) => {
+      const f = r.file;
+      const accounts = f.accounts.filter((a) => q.every((w) => a.lender.toLowerCase().includes(w))
+        && (!v.account || v.account === `${r.key}:${a.id}`) && (!v.group || a.group === v.group) && (!v.status || a.status === v.status)
+        && (!v.record || (v.record === "missed") === a.missed) && (!v.to || !a.start || a.start <= v.to) && (!v.from || !a.end || a.end >= v.from));
+      const searches = f.searches.filter((s) => !v.searches || (v.searches === "credit") === s.credit);
+      return Object.assign({}, r, { file: Object.assign({}, f, { accounts: accounts, searches: searches }) });
+    });
+    const names = Object.fromEntries(CR_GROUPS), words = [];
+    if (v.person) words.push((files.find((r) => r.key === v.person) || {}).who || v.person);
+    if (v.account) files.forEach((r) => r.file.accounts.forEach((a) => { if (v.account === `${r.key}:${a.id}`) words.push(`${a.lender} ${(a.number || "").slice(-4)}`); }));
+    if (v.group) words.push(names[v.group]);
+    if (v.status) words.push(v.status.charAt(0).toUpperCase() + v.status.slice(1));
+    if (v.record) words.push(v.record === "missed" ? "missed payments" : "always paid on time");
+    if (q.length) words.push(`“${q.join(" ")}”`);
+    if (v.searches) words.push(v.searches === "credit" ? "credit searches" : "other searches");
+    if (v.from || v.to) words.push(`open between ${v.from || "…"} and ${v.to || "…"}`);
+    return { files: out, words: words };
+  }
 
   // Each credit report on its own, as it arrived.
   function creditHtml(c) {
@@ -1523,6 +1568,15 @@
           <button class="btn-primary" data-categorise="${esc(t.id)}">Categorise</button></div></div>`;
     }).join("");
 
+    // Tabs: one part of the case at a time (as the service's case page).
+    const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
+    const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
+    const tabs = [["summary", dot + (act ? "Needs action" : check ? "Worth a check" : "All clear"), act + check],
+                  ["income", "Income and expenditure"], ["taken", "Fact find"], ["credit", "Credit report"],
+                  ["decide", "To decide", blocking(c)], ["bank", "Bank transactions", Object.keys(waiting).length],
+                  ["sources", "Sources"], ["outputs", "Outputs and audit"]];
+    if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
+    const panel = (key, html) => `<section class="tab-panel" data-tab="${key}"${key === caseTab ? "" : " hidden"}>${html}</section>`;
     const decided = c.findings.filter((f) => f.decision && !f.decision.default && f.decision.kind !== "RESOLVED");
     const matches = c.findings.filter((f) => f.outcome === "MATCH");
     const audit = ff.audit.slice().reverse().map((e) => `
@@ -1545,23 +1599,18 @@
         <button class="btn-secondary" data-open-credit>Credit report</button>
         <button class="btn-secondary" id="dl-report">Full report (PDF)</button>
       </div>
-      ${summaryHtml(c)}
-      ${pickerHtml(c)}
+      <div class="case-bar">${pickerHtml(c)}
+        <nav class="case-tabs">${tabs.map(([key, name, count]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count">${count}</span>` : ""}</button>`).join("")}</nav></div>
 
-      ${bankReportHtml(c)}
+      ${panel("summary", summaryHtml(c) + `<div data-src="all">${glanceHtml(c)}</div>`)}
 
-      <div data-src="all">${glanceHtml(c)}</div>
+      ${panel("income", bankReportHtml(c))}
 
-      ${takenHtml(c)}
+      ${panel("taken", takenHtml(c))}
 
-      <div class="section" data-src="all"><h2>Sources</h2>${sources}</div>
+      ${panel("credit", creditHtml(c))}
 
-      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
-        <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
-        ${bankingHtml(c)}</div>` : ""}
-
-      ${creditHtml(c)}
-
+      <section class="tab-panel" data-tab="decide"${caseTab === "decide" ? "" : " hidden"}>
       <div class="section" data-src="all"><h2 id="decide">To decide${blocking(c) ? `<span class="count">${plural(blocking(c), "difference")}</span>` : ""}</h2>
         ${open.map(findingHtml).join("") || '<div class="panel">Nothing to decide.</div>'}
         ${notes.length ? `<h3 style="margin:18px 0 8px;font-size:15px;font-weight:500">Worth knowing</h3>${notes.map((f) => `<div class="panel finding ${f.outcome.toLowerCase()}">
@@ -1577,11 +1626,20 @@
           <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
         </div>
       </div>
+      </section>
 
+      <section class="tab-panel" data-tab="bank"${caseTab === "bank" ? "" : " hidden"}>
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
         <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which. Every transaction, with its balance, category and filters, is on the <button class="link-button" data-open-statement>Open Banking statement</button> (${c.transactions.length}).</p>
         ${toCategorise || '<div class="panel small">Every transaction is categorised.</div>'}</div>` : ""}
+      ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>Open Banking summary<span class="count">one per person or company</span></h2>
+        <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired, every transaction on a budget line.</p>
+        ${bankingHtml(c)}</div>` : ""}
+      </section>
 
+      ${panel("sources", `<div class="section" data-src="all"><h2>Sources</h2>${sources}</div>`)}
+
+      <section class="tab-panel" data-tab="outputs"${caseTab === "outputs" ? "" : " hidden"}>
       <div class="section" data-src="all"><h2>Outputs</h2>
         <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
           <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option>
@@ -1595,11 +1653,26 @@
         ${audit ? `<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Field</th><th class="num">Was</th><th class="num">Now</th><th>From</th></tr></thead><tbody>${audit}</tbody></table></div>`
                 : '<p class="small">No changes yet. Accepting a figure or categorising a transaction records it here.</p>'}
       </div>
+      </section>
       <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real affordability assessment.</p>`;
     banner = "";
 
     $("case-back").addEventListener("click", () => showView("portal"));
     const filterRows = () => {};
+    const showTab = (key) => {
+      caseTab = key;
+      document.querySelectorAll("#case-view .tab-panel").forEach((p) => { p.hidden = p.dataset.tab !== key; });
+      document.querySelectorAll("#case-view [data-tab-button]").forEach((b) => b.classList.toggle("active", b.dataset.tabButton === key));
+    };
+    document.querySelectorAll("#case-view [data-tab-button]").forEach((b) => b.addEventListener("click", () => {
+      showTab(b.dataset.tabButton); window.scrollTo(0, 0);
+    }));
+    // A link to a part of the case (a flag's, say) opens the tab it is on.
+    document.querySelectorAll('#case-view a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
+      const target = document.getElementById(a.getAttribute("href").slice(1)), where = target && target.closest(".tab-panel");
+      if (!where) return;
+      e.preventDefault(); showTab(where.dataset.tab); target.scrollIntoView();
+    }));
     document.querySelectorAll("[data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
     document.querySelectorAll("[data-open-credit]").forEach((b) => b.addEventListener("click", openCredit));
     document.querySelectorAll("[data-verify]").forEach((b) => b.addEventListener("click", () => {
@@ -1696,8 +1769,9 @@
   // filtered on its page (cases/report.build_statement).
   function downloadReport(c, button) { return writePdf(c, button, null); }
   function downloadStatement(c, rows, words) { return writePdf(c, "st-pdf", { rows: rows, words: words }); }
+  function downloadCredit(c, files, words) { return writePdf(c, "cr-pdf", { credit: files, words: words }); }
   function writePdf(c, button, only) {
-    return withButton(button, only ? "Writing the statement…" : "Writing the report…", async () => {
+    return withButton(button, only ? (only.credit ? "Writing the credit report…" : "Writing the statement…") : "Writing the report…", async () => {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 42, width = W - 2 * M;
@@ -1738,7 +1812,7 @@
 
       // The heading and the case's details.
       doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(...ink);
-      doc.text(only ? "Open Banking Statement (DEMO)" : "Full Report (DEMO)", M, y + 12);
+      doc.text(only ? (only.credit ? "Credit Report (DEMO)" : "Open Banking Statement (DEMO)") : "Full Report (DEMO)", M, y + 12);
       // The logo, shrunk first: the file is print size and jsPDF would embed it whole.
       try {
         const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = "logo.png"; });
@@ -1749,7 +1823,7 @@
       y += 40;
       const people = c.parties.filter((p) => p.role !== "COMPANY");
       const dobs = data.applicants.map((a) => a.date_of_birth).filter(Boolean).join(" · ") || "–";
-      const span = (() => { const d = (only ? only.rows : c.transactions).map((t) => t.date).sort(); return d.length ? `${d[0].split("-").reverse().join("/")} - ${d[d.length - 1].split("-").reverse().join("/")}` : "–"; })();
+      const span = (() => { const d = (only && only.rows ? only.rows : c.transactions).map((t) => t.date).sort(); return d.length ? `${d[0].split("-").reverse().join("/")} - ${d[d.length - 1].split("-").reverse().join("/")}` : "–"; })();
       const half = (width - 24) / 2, top = y;
       const facts = (rows, left) => table(null, rows.map(([k, v]) => [{ content: k, styles: { fontStyle: "bold" } }, v]),
         { left: left, right: W - left - half, tableWidth: half, columns: { 0: { cellWidth: half * 0.42 } } });
@@ -1758,9 +1832,59 @@
       const after = y; y = top;
       facts([["Report date", now.toLocaleString("en-GB")], ["Case opened", dateLong(c.opened)], ["Transaction date range", span],
              ["Status", c.status === "COMPLETE" ? "Complete" : "Broker review"]]
-             .concat(only ? [["Showing", only.words.join("; ") || "Every transaction"]] : []), M + half + 24);
+             .concat(only ? [["Showing", only.words.join("; ") || (only.credit ? "The whole of each report" : "Every transaction")]] : []), M + half + 24);
       y = Math.max(after, y) + 4;
 
+      if (only && only.credit) {
+        const codeColour = { D: [198, 47, 59], S: [63, 154, 77], 0: [31, 122, 99] };
+        only.credit.forEach((r) => {
+          const f = r.file;
+          section(`Credit Summary · ${r.who}`);
+          table(null, [["Name", f.name || r.who], ["Reference", f.reference || "–"], ["Date of birth", f.date_of_birth || "–"],
+                       ["Current address", f.address || "–"], ["Electoral roll", f.electoral_roll],
+                       ["Credit score", f.score ? `${f.score.value} · ${f.score.band}` : "–"], ["Report date", f.report_date || "–"]]
+            .map(([k, v]) => [{ content: k, styles: { fontStyle: "bold" } }, v]), { columns: { 0: { cellWidth: width * 0.3 } } });
+          table(["Account snapshot", "Accounts", "Owed now"], f.snapshot.map((s2) => [(s2.warn ? "! " : "") + s2.label, String(s2.count), gbp(s2.amount)]),
+                { nums: [1, 2] });
+          doc.setFontSize(7.5); doc.setTextColor(...muted);
+          doc.text("Alerts · " + f.alerts.map((a) => `${a.label}: ${a.level === "ok" ? "clear" : "see below"}`).join(" · "), M, y - 4);
+          doc.setTextColor(...ink); y += 6;
+          section(`Account History · ${r.who}`);
+          if (!f.accounts.length) { doc.setFontSize(9); doc.text("No accounts match.", M, y + 4); y += 18; }
+          f.accounts.forEach((a) => {
+            room(150);
+            doc.setFillColor(123, 123, 123); doc.rect(M, y, width, 18, "F");
+            doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(255, 255, 255);
+            doc.text(`${a.lender} / ${a.number || "–"} – ${a.type} · ${a.status.charAt(0).toUpperCase() + a.status.slice(1)}`, M + 6, y + 12);
+            doc.setFont("helvetica", "normal"); doc.setTextColor(...ink); y += 20;
+            const pairs = a.left.map((l, i) => [{ content: l[0], styles: { fontStyle: "bold" } }, l[1],
+              ...(a.right[i] ? [{ content: a.right[i][0], styles: { fontStyle: "bold" } }, a.right[i][1]] : ["", ""])]);
+            table(null, pairs, { zebra: false, columns: { 0: { cellWidth: width * 0.22 }, 2: { cellWidth: width * 0.26 } } });
+            if (a.years.length) {
+              const body = [], bold = [];
+              a.years.forEach((yr) => {
+                bold.push(body.length); body.push([String(yr.year)].concat(CR_MONTHS));
+                body.push(["Payment status"].concat(yr.months.map((m) => m.status ? { content: m.status,
+                  styles: { fontStyle: "bold", textColor: codeColour[m.status] || [138, 90, 6], halign: "center" } } : "")));
+                body.push(["Balance (£)"].concat(yr.months.map((m) => m.balance === null || m.balance === undefined ? "" : String(m.balance))));
+              });
+              y -= 6;
+              table(null, body, { zebra: false, bold: bold, columns: { 0: { cellWidth: width * 0.16 } } });
+            }
+          });
+          doc.setFontSize(7.5); doc.setTextColor(...muted);
+          doc.text(doc.splitTextToSize("Payment status: " + f.codes.map(([k, v]) => `${k} ${v.toLowerCase()}`).join(", "), width), M, y - 2);
+          doc.setTextColor(...ink); y += 14;
+          table(["Electoral roll", "Address", "At present", "On the roll"],
+                f.electoral.length ? f.electoral.map((e) => [e.name, e.address || "", e.current ? "Yes" : "No", `${e.from} to ${e.to}`]) : [[f.electoral_roll, "", "", ""]]);
+          table(["Searches", "Company", "Name searched", "Purpose", "Type"], f.searches.length ? f.searches.map((s2) => [s2.day, s2.company, s2.name, s2.purpose,
+                s2.credit ? "Credit search" : "Other search"]) : [["None.", "", "", "", ""]]);
+          table(null, [[{ content: "Court and insolvency", styles: { fontStyle: "bold" } }, f.courts.map((x) => `${label(x.type)} ${gbp(x.amount)} ${x.date} (${x.satisfied ? "satisfied" : "not satisfied"})`).join("; ") || "No relevant data exists in this category."],
+                       [{ content: "Notices of correction", styles: { fontStyle: "bold" } }, f.notices.join("; ") || "No relevant data exists in this category."]],
+                { columns: { 0: { cellWidth: width * 0.25 } } });
+        });
+        if (!only.credit.length) { doc.setFontSize(9); doc.text("No credit report matches.", M, y + 4); }
+      }
       if (!only) {
       // What the adviser needs to know, first.
       section("Summary");
@@ -1770,11 +1894,11 @@
 
       }
       // The bank accounts, with sort code, number and balance.
-      const accounts = [], held = only ? new Set(only.rows.map((t) => t.account)) : null;
+      const accounts = [], held = only && only.rows ? new Set(only.rows.map((t) => t.account)) : null;
       c.parties.forEach((p) => ((c.accounts[p.key] || {}).accounts || []).forEach((a) => {
         if (!held || !held.size || held.has(a.id)) accounts.push(Object.assign({ who: p.name }, a));
       }));
-      if (accounts.length) {
+      if (accounts.length && !(only && only.credit)) {
         section("Bank Accounts");
         table(["Bank accounts", "Sort code", "Account number", "Balance"], accounts.map((a) => [
           `${a.provider}\n${a.holder || a.who} · ${a.kind} (Open Banking)`, a.sort_code || "–", a.number || "–",
@@ -1903,8 +2027,8 @@
 
       }
       // The full transaction list, on pages of its own.
-      const rows = only ? only.rows : statementRows(c);
-      if (rows.length || only) {
+      const rows = only ? only.rows || [] : statementRows(c);
+      if (rows.length || (only && only.rows)) {
         if (!only) { doc.addPage(); y = 50; }
         section("OPEN BANKING STATEMENT");
         doc.setFontSize(7.5); doc.setTextColor(...muted);
@@ -1932,7 +2056,7 @@
         doc.text(`Page ${i} of ${pages}  ·  ${c.reference}  ·  DEMO from fictional test data`, M, H - 24);
         doc.text(`Generated on ${generated}`, W - M, H - 24, { align: "right" });
       }
-      if (only) { doc.save(`${c.reference} Open Banking statement.pdf`); return; }
+      if (only) { doc.save(`${c.reference} ${only.credit ? "credit report" : "Open Banking statement"}.pdf`); return; }
       doc.save(`${c.reference} full report.pdf`);
       made(c, "report", `${c.reference} full report.pdf`, button);
     });
