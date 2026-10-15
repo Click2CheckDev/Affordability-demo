@@ -417,7 +417,16 @@
   /* The Show picker and the case's tabs stay at the top of the screen. */
   #case-view.card.wide { overflow: visible; }
   .case-bar { position: sticky; top: 0; z-index: 6; background: #fff; margin: 8px 0 14px; padding-top: 8px; border-bottom: 1px solid var(--border); }
-  .source-picker { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 0 0 8px; }
+  .source-picker { padding: 0; }
+  .pick-row { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #ececef; }
+  .pick-row[hidden], .tab-panel[hidden], .src-empty[hidden] { display: none; }
+  .pick-row.sub { background: #f7f7f8; padding-left: 10px; }
+  .pick-label { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-right: 8px; }
+  .source-picker button { width: auto; height: 36px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
+                          padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--muted); }
+  .pick-row.sub button { height: 32px; font-size: 12.5px; }
+  .source-picker button:hover { color: var(--ink); }
+  .source-picker button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
   .case-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
   .case-tabs button { width: auto; height: 36px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
                       padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
@@ -1083,29 +1092,46 @@
       <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor ? `<a href="#${f.anchor}" data-flag-link>${esc(f.title)}</a>` : esc(f.title)}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
   }
 
-  // The source picker: everything merged, one bank account, or one credit report.
+  // The Show bar in two rows (cases/screens.picker): the household and each
+  // person first; once one is picked, their own sources (each bank account and
+  // their credit report). With one person, their sources are always there.
   function pickerHtml(c) {
-    // The household (everyone), then each person (their accounts and credit
-    // report), each of their accounts and their credit report.
-    const opts = [["all", "Household · all sources", "all"]];
-    const several = c.parties.length > 1;
+    const top = [["all", "Household · all sources", "all", ""]], rows = [];
     c.parties.forEach((p) => {
-      const own = ((c.accounts[p.key] || {}).accounts || []).map((a) => ["acct:" + a.id, `${p.name} · ${a.provider} ${a.account}`]);
+      const own = ((c.accounts[p.key] || {}).accounts || []).map((a) => ["acct:" + a.id, `${a.provider} ${a.account}`, "acct:" + a.id]);
       const packed = c.pack.parties.find((x) => x.key === p.key);
-      if (packed && packed.credit) own.push(["credit:" + p.key, `${p.name} · credit report`]);
-      if (several) opts.push(["person:" + p.key, p.name, ["person:" + p.key].concat(own.map(([v]) => v)).join(" ")]);
-      own.forEach(([v, n]) => opts.push([v, n, v]));
+      if (packed && packed.credit) own.push(["credit:" + p.key, "Credit report", "credit:" + p.key]);
+      if (c.parties.length > 1) top.push(["person:" + p.key, p.name, ["person:" + p.key].concat(own.map(([v]) => v)).join(" "), p.key]);
+      rows.push([p.key, p.name, own]);
     });
-    return opts.length > 1 ? `<div class="source-picker"><span class="small muted">Show</span>${opts.map(([v, n, m]) =>
-      `<button class="${v === pick ? "btn-primary" : "btn-secondary"}" data-pick="${esc(v)}" data-match="${esc(m)}"${v.startsWith("person:") ? ' style="font-weight:600"' : ""}>${esc(n)}</button>`).join("")}</div>` : "";
+    if (top.length + rows.reduce((n, r) => n + r[2].length, 0) < 2) return "";
+    const button = (v, n, m, owner) => `<button data-pick="${esc(v)}" data-match="${esc(m)}" data-owner="${esc(owner)}">${esc(n)}</button>`;
+    return `<div class="source-picker" data-only="${c.parties.length === 1 ? esc(c.parties[0].key) : ""}">
+      <div class="pick-row"><span class="pick-label">Show</span>${top.map(([v, n, m, o]) => button(v, n, m, o)).join("")}</div>
+      ${rows.map(([key, name, own]) => `<div class="pick-row sub" data-sub-of="${esc(key)}" hidden><span class="pick-label">${esc(name)}</span>${own.map(([v, n, m]) => button(v, n, m, key)).join("")}</div>`).join("")}</div>`;
   }
   function applyPick() {
-    const chosen = document.querySelector(`#case-view [data-pick="${CSS.escape(pick)}"]`);
+    let chosen = document.querySelector(`#case-view [data-pick="${CSS.escape(pick)}"]`);
+    if (!chosen) { pick = "all"; chosen = document.querySelector('#case-view [data-pick="all"]'); }
     const match = chosen ? chosen.dataset.match.split(" ") : ["all"];
+    const bar = document.querySelector("#case-view .source-picker");
+    if (bar) {
+      const owner = chosen.dataset.owner || bar.dataset.only;
+      bar.querySelectorAll("[data-pick]").forEach((b) => b.classList.toggle("active",
+        b === chosen || (!!owner && b.dataset.owner === owner && !b.parentNode.classList.contains("sub"))));
+      bar.querySelectorAll("[data-sub-of]").forEach((row) => { row.hidden = row.dataset.subOf !== owner; });
+    }
     document.querySelectorAll("#case-view [data-src]").forEach((el) =>
       el.classList.toggle("src-off", !el.dataset.src.split(" ").some((t) => match.includes(t))));
     Array.from(document.querySelectorAll("#case-view .src-group")).reverse().forEach((g) =>
       g.classList.toggle("src-off", !g.querySelector("[data-src]:not(.src-off)")));
+    // A tab with nothing for the source picked says so.
+    document.querySelectorAll("#case-view .tab-panel").forEach((panel) => {
+      let note = panel.querySelector(":scope > .src-empty");
+      if (!note) { note = document.createElement("p"); note.className = "panel small src-empty"; panel.appendChild(note); }
+      note.hidden = !panel.querySelector("[data-src]") || !!panel.querySelector("[data-src]:not(.src-off)");
+      note.textContent = `Nothing here for ${chosen ? chosen.textContent.trim() : "this source"}. Pick the household or a person in Show.`;
+    });
   }
 
   // ---- outputs --------------------------------------------------------------------------------
@@ -1381,14 +1407,12 @@
   // ---- the credit report: each person's full credit file (cases/credit.html) ---------------------
   const CR_GROUPS = [["long", "Long-term loans"], ["short", "Short-term credit"], ["payday", "Payday loans"], ["current", "Current accounts"]];
   const CR_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  function renderCredit() {
-    // The credit files never change on the page: read from the demo data, not the saved case.
-    const c = currentCase, files = (D.cases.find((d) => d.id === c.id) || {}).credit_files || [];
-    const first = files.map((r) => r.file.first).filter(Boolean).sort()[0] || "";
-    const last = files.map((r) => r.file.last).sort().slice(-1)[0] || "";
+  // Each person's full credit file (cases/_credit_file.html).
+  function creditFileHtml(r) {
     const icon = (level) => `<span class="cr-icon ${level}">${level === "ok" ? "✓" : "!"}</span>`;
     const facts = (rows) => `<table class="cr-facts">${rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</table>`;
-    const file = (r) => { const f = r.file; return `<section class="credit-file" data-person="${esc(r.key)}">
+    const f = r.file;
+    return `<section class="credit-file" data-person="${esc(r.key)}" data-src="all person:${esc(r.key)} credit:${esc(r.key)}">
       <div class="cr-grid">
         <div class="panel"><div class="cr-title">Credit Summary <span class="muted">${esc(f.report_date)}</span></div>
           ${facts([["Name", f.name || r.who], ["Reference", f.reference || "–"], ["Date of birth", f.date_of_birth || "–"], ["Current address", f.address || "–"], ["Electoral roll", f.electoral_roll]])}</div>
@@ -1433,7 +1457,15 @@
             || '<p class="small muted" style="margin:4px 0">No relevant data exists in this category.</p>'}</div>
         <div class="panel" id="cr-notices-${esc(r.key)}"><div class="cr-title">Notices of Correction</div>
           ${f.notices.map((n) => `<p style="margin:4px 0">${esc(n)}</p>`).join("") || '<p class="small muted" style="margin:4px 0">No relevant data exists in this category.</p>'}</div>
-      </div></section>`; };
+      </div></section>`;
+  }
+
+  function renderCredit() {
+    // The credit files never change on the page: read from the demo data, not the saved case.
+    const c = currentCase, files = (D.cases.find((d) => d.id === c.id) || {}).credit_files || [];
+    const first = files.map((r) => r.file.first).filter(Boolean).sort()[0] || "";
+    const last = files.map((r) => r.file.last).sort().slice(-1)[0] || "";
+    const file = creditFileHtml;
     $("credit-view").innerHTML = `
       <button class="back-link" id="credit-back">&larr; ${esc(caseTitle(c))}</button>
       <div class="eyebrow muted">${esc(c.reference)}</div>
@@ -1512,18 +1544,11 @@
 
   // Each credit report on its own, as it arrived.
   function creditHtml(c) {
-    const reports = c.pack.parties.filter((p) => p.credit).map((p) => {
-      const cr = p.credit, accounts = cr.accounts || [];
-      const bits = [cr.score ? `score ${cr.score}` : "", cr.on_electoral_roll === true ? "on the electoral roll" : cr.on_electoral_roll === false ? "not on the electoral roll" : ""].filter(Boolean).join(" · ");
-      const courts = (cr.adverse || []).filter((a) => !a.lender).map((a) => `<p class="small" style="margin:6px 0 0">${esc(a.type)}${a.amount ? " " + gbp(a.amount) : ""}${a.date ? ", " + esc(a.date) : ""} · ${a.satisfied ? "satisfied" : "unsatisfied"}</p>`).join("");
-      return `<div class="detail-block" data-src="all credit:${esc(p.key)}"><div class="detail-block-header">${esc(p.name)} <span class="muted" style="font-weight:400">${esc(bits)}</span></div>
-        <div class="table-wrap"><table><thead><tr><th>Lender</th><th>Type</th><th>Status</th><th class="num">Balance</th><th class="num">Monthly</th><th class="num">Limit</th></tr></thead>
-        <tbody>${accounts.map((a) => `<tr><td>${esc(a.lender)}</td><td>${esc(label(a.type))}</td>
-          <td>${pill(["ACTIVE", "SETTLED"].includes(a.status) ? "derived" : "alert", a.status)}</td><td class="num">${gbp(a.balance)}</td>
-          <td class="num">${gbp(a.monthly_payment)}</td><td class="num">${a.credit_limit ? gbp(a.credit_limit) : "–"}</td></tr>`).join("")
-          || '<tr><td colspan="6" class="small">No accounts on the report.</td></tr>'}</tbody></table></div>${courts}</div>`;
-    }).join("");
-    return reports ? `<div class="section src-group"><h2 id="credit">Credit report <button class="btn-secondary" data-open-credit style="width:auto;padding:6px 12px;font-size:12.5px;margin-left:8px">Open the full credit report</button></h2>${reports}</div>` : "";
+    // Each person's full credit file, as the Credit report button shows it.
+    const files = (D.cases.find((d) => d.id === c.id) || {}).credit_files || [];
+    return files.length ? `<div class="section src-group"><h2 id="credit">Credit report <button class="btn-secondary" data-open-credit style="width:auto;padding:6px 12px;font-size:12.5px;margin-left:8px">Filter or download</button></h2>
+      <p class="section-note">Each person's full credit file, as the credit reference agency supplied it. The Credit report page has the same with filters and a PDF.</p>
+      ${files.map(creditFileHtml).join("")}</div>` : "";
   }
 
   function renderCase() {
@@ -1683,16 +1708,8 @@
                               new: "Sent to HMRC to verify", origin: "BROKER", status: "", reason: "" });
       save(); renderCase();
     }));
-    document.querySelectorAll("[data-flag-link]").forEach((a) => a.addEventListener("click", () => {
-      pick = "all";
-      document.querySelectorAll("[data-pick]").forEach((x) => { x.className = x.dataset.pick === pick ? "btn-primary" : "btn-secondary"; });
-      applyPick(); filterRows();
-    }));
-    document.querySelectorAll("[data-pick]").forEach((b) => b.addEventListener("click", () => {
-      pick = b.dataset.pick;
-      document.querySelectorAll("[data-pick]").forEach((x) => { x.className = x.dataset.pick === pick ? "btn-primary" : "btn-secondary"; });
-      applyPick(); filterRows();
-    }));
+    document.querySelectorAll("[data-flag-link]").forEach((a) => a.addEventListener("click", () => { pick = "all"; applyPick(); }));
+    document.querySelectorAll("#case-view [data-pick]").forEach((b) => b.addEventListener("click", () => { pick = b.dataset.pick; applyPick(); }));
     applyPick();
     document.querySelectorAll("[data-accept]").forEach((b) => b.addEventListener("click", () => {
       E.accept(c, b.dataset.accept, WHO, D.lines); save(); renderCase();
