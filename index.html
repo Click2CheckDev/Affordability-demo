@@ -466,6 +466,11 @@
   .btn-verify { width: auto; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
                 background: #fff; color: var(--brand); border: 1px solid var(--brand); margin-left: 6px; }
   .statement td { padding-top: 7px; padding-bottom: 7px; }
+  /* What a followed flag is about, lit up for a moment (cases/base.html) */
+  @keyframes flash { 0%, 35% { background: #fff1a8; box-shadow: 0 0 0 2px var(--brand); } 100% { background: transparent; box-shadow: none; } }
+  @keyframes flashrow { 0%, 35% { background: #fff1a8; } 100% { background: transparent; } }
+  .flash { animation: flash 2.8s ease-out; }
+  tr.flash { animation: none; } tr.flash > td { animation: flashrow 2.8s ease-out; }
   /* The budget planner (cases/base.html) */
   .budget-switch { display: flex; gap: 2px; border-bottom: 1px solid #ececef; margin-bottom: 12px; }
   .budget-switch button { width: auto; height: 34px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
@@ -811,7 +816,7 @@
         <button class="btn-secondary" data-dismiss="${esc(f.id)}">Keep entered</button>
       </div>`;
     }
-    return `<div class="panel finding ${outcome}">
+    return `<div class="panel finding ${outcome}" data-finding="${esc(f.id)}">
       <div class="finding-head">${pill(outcome, OUTCOME[f.outcome] || f.outcome)}
         <span class="finding-source">${esc(SOURCE[f.source] || f.source)}</span></div>
       <div class="finding-text">${esc(f.message)}</div>
@@ -894,14 +899,16 @@
   // it came from, and what the customer said where a source's was taken.
   function takenHtml(c) {
     const data = c.factfind.data, prov = c.factfind.provenance, idx = sourceIndex(c);
-    const said = {};
+    const said = {}, takenId = {};
     c.findings.filter((f) => f.decision && f.decision.default).forEach((f) => {
       if (f.action === "ADD_COMMITMENT") {
         const row = (f.extra || {}).row || {};
         data.commitments.forEach((r, j) => {
-          if (r && r.lender === row.lender && r.owner === row.owner) said[`commitments[${j}].monthly_payment`] = "Not entered";
+          if (r && r.lender === row.lender && r.owner === row.owner) {
+            said[`commitments[${j}].monthly_payment`] = "Not entered"; takenId[`commitments[${j}].monthly_payment`] = f.id;
+          }
         });
-      } else said[f.path] = gbp(f.declared);
+      } else { said[f.path] = gbp(f.declared); takenId[f.path] = f.id; }
     });
     const sections = {}; D.sections.forEach((s) => { sections[s] = []; });
     const row = (label, path, kind) => {
@@ -933,7 +940,7 @@
       ${D.sections.map((name) => [name, sections[name].filter((r) => r.value !== "")]).map(([name, rows]) => rows.length ? `
       <div class="detail-block src-group"><div class="detail-block-header">${esc(name)}</div>
         <div class="table-wrap"><table><thead><tr><th>Field</th><th class="num">Figure</th><th>From</th><th class="num">Customer said</th><th>Status</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr data-src="${esc(r.src)}"><td>${esc(r.label)}${r.verify ? `<div style="margin-top:4px">${verifyHtml(c, r.verify)}</div>` : ""}</td><td class="num">${esc(r.value)}</td>
+        <tbody>${rows.map((r) => `<tr data-src="${esc(r.src)}" data-path="${esc(r.path)}"${takenId[r.path] ? ` data-finding="${esc(takenId[r.path])}"` : ""}><td>${esc(r.label)}${r.verify ? `<div style="margin-top:4px">${verifyHtml(c, r.verify)}</div>` : ""}</td><td class="num">${esc(r.value)}</td>
           <td class="small muted">${esc(r.origin ? SOURCE[r.origin] || label(r.origin) : "")}</td>
           <td class="num small muted">${esc(r.said)}</td>
           <td>${r.status ? pill(r.status.toLowerCase(), r.status) : ""}</td></tr>`).join("")}</tbody></table></div></div>` : "").join("")}</div>`;
@@ -948,37 +955,40 @@
     const taken = c.findings.filter((f) => f.decision && f.decision.default);
     const income = num(s.net_monthly_income), out = [];
     const pct = (part, whole) => whole ? `${Math.round(part / whole * 100)}%` : "–";
-    const flag = (level, title, detail, anchor, verify) => out.push({ level: level, title: title, detail: detail || "", anchor: anchor || "", verify: verify || "" });
+    const flag = (level, title, detail, anchor, verify, targets, query) => out.push({ level: level, title: title, detail: detail || "",
+      anchor: anchor || "", verify: verify || "", targets: targets || [], query: query || "" });
     const left = num(s.disposable_monthly);
     const money = `Net income ${gbp(income)}, outgoings ${gbp(s.monthly_expenditure)}.`;
-    if (left < 0) flag("ACT", `Spends more than comes in: ${gbp(left)} a month`, money, "income");
-    else if (income && left < income * 0.10) flag("CHECK", `Little left over: ${gbp(left)} a month (${pct(left, income)} of income)`, money, "income");
-    else flag("OK", `${gbp(left)} a month left over (${pct(left, income)} of income)`, money, "income");
+    if (left < 0) flag("ACT", `Spends more than comes in: ${gbp(left)} a month`, money, "income", "", ["hl:disposable"]);
+    else if (income && left < income * 0.10) flag("CHECK", `Little left over: ${gbp(left)} a month (${pct(left, income)} of income)`, money, "income", "", ["hl:disposable"]);
+    else flag("OK", `${gbp(left)} a month left over (${pct(left, income)} of income)`, money, "income", "", ["hl:disposable"]);
     const repay = num(s.monthly_commitments);
     if (income && repay) {
       const share = repay / income;
       flag(share >= 0.40 ? "ACT" : share >= 0.25 ? "CHECK" : "OK",
-           `Credit repayments ${gbp(repay)} a month (${pct(repay, income)} of income)`, "From the credit report and the bank.", "credit");
+           `Credit repayments ${gbp(repay)} a month (${pct(repay, income)} of income)`, "From the credit report and the bank.", "income", "", ["hl:credit-commitments"]);
     }
     const adverse = open.filter((f) => f.outcome === "ALERT" && f.path.endsWith(".credit_history"));
     if (adverse.length) flag("ACT", `Adverse credit: ${adverse.length} item${adverse.length > 1 ? "s" : ""} in the last six years`,
-                             adverse.map((f) => f.message).join(" "), "credit");
+                             adverse.map((f) => f.message).join(" "), "credit", "", [], "record=missed");
     else if (c.pack.parties.some((p) => p.credit)) flag("OK", "No adverse credit in the last six years", "", "credit");
     c.pack.parties.forEach((p) => ((p.credit || {}).accounts || []).forEach((a) => {
       const limit = num(a.credit_limit), bal = num(a.balance);
       if (a.status === "ACTIVE" && limit > 0 && bal / limit >= 0.75) {
-        flag(bal / limit >= 0.90 ? "ACT" : "CHECK", `${a.lender} card at ${pct(bal, limit)} of its limit`, `${p.name}: ${gbp(bal)} of ${gbp(limit)}.`, "credit");
+        flag(bal / limit >= 0.90 ? "ACT" : "CHECK", `${a.lender} card at ${pct(bal, limit)} of its limit`, `${p.name}: ${gbp(bal)} of ${gbp(limit)}.`, "credit", "", [],
+             "group=short&status=active");
       }
     }));
     const gambling = open.find((f) => f.path === "expenditure.gambling" && f.outcome === "ALERT");
     if (gambling) {
       const amount = num(gambling.evidence);
       flag(income && amount >= income * 0.10 ? "ACT" : "CHECK", `Gambling ${gbp(amount)} a month (${pct(amount, income)} of income)`,
-           "Regular payments to gambling sites in the bank statements.", "transactions");
+           "Regular payments to gambling sites in the bank statements.", "income", "", ["hl:cat:Gambling", "path:expenditure.gambling"]);
     } else if (c.transactions.length) flag("OK", "No regular gambling", "", "transactions");
     const undisclosed = taken.filter((f) => f.action === "ADD_COMMITMENT");
     if (undisclosed.length) flag("CHECK", `Customer didn't mention ${undisclosed.length} credit agreement${undisclosed.length > 1 ? "s" : ""}`,
-      "Added from the credit report: " + undisclosed.map((f) => `${((f.extra || {}).row || {}).lender || "a lender"} ${gbp(f.proposed)} a month`).join(", ") + ".", "taken");
+      "Added from the credit report: " + undisclosed.map((f) => `${((f.extra || {}).row || {}).lender || "a lender"} ${gbp(f.proposed)} a month`).join(", ") + ".", "taken", "",
+      undisclosed.map((f) => "finding:" + f.id));
     const label = (path) => {
       const m = /^commitments\[(\d+)\]/.exec(path), row = m && data.commitments[+m[1]];
       if (row) return `${row.lender} payment`;
@@ -988,21 +998,23 @@
     if (outgoings.length) {
       const more = outgoings.reduce((t, f) => t + num(f.proposed) - num(f.declared), 0);
       flag("CHECK", `Customer understated outgoings by ${gbp(more)} a month`,
-           "Taken from the reports instead: " + outgoings.map((f) => `${label(f.path)} ${gbp(f.declared)} → ${gbp(f.proposed)}`).join(", ") + ".", "taken");
+           "Taken from the reports instead: " + outgoings.map((f) => `${label(f.path)} ${gbp(f.declared)} → ${gbp(f.proposed)}`).join(", ") + ".", "taken", "",
+           outgoings.map((f) => "path:" + f.path));
     }
     const earnings = taken.filter((f) => /^(company\.|applicants\[)/.test(f.path) && num(f.proposed) < num(f.declared));
     earnings.forEach((f) => flag("CHECK", `Customer overstated ${f.path.startsWith("company.") ? "turnover" : "income"} by ${gbp(num(f.declared) - num(f.proposed))}`, f.message, "taken",
-                                 f.path.startsWith("company.") ? "" : f.party));
+                                 f.path.startsWith("company.") ? "" : f.party, ["path:" + f.path]));
     if (!undisclosed.length && !outgoings.length && !earnings.length && c.findings.length) flag("OK", "Nothing hidden or understated by the customer", "", "taken");
     const deciding = open.filter((f) => f.outcome === "DIFFERENCE");
-    if (deciding.length) flag("ACT", `${deciding.length} difference${deciding.length > 1 ? "s" : ""} to decide`, deciding[0].message, "decide");
+    if (deciding.length) flag("ACT", `${deciding.length} difference${deciding.length > 1 ? "s" : ""} to decide`, deciding[0].message, "decide", "",
+                              deciding.map((f) => "finding:" + f.id));
     open.forEach((f) => {
       if (f.path.endsWith(".self_employed_profit")) flag("CHECK", "Self-employed profit needs the SA302 to check",
-        `${gbp(f.evidence)} a year arrives in the bank; Open Banking can't show profit.`, "taken", f.party);
-      else if (f.path.endsWith(".uncategorised")) flag("CHECK", `Transactions not yet categorised (${gbp(f.evidence)} out)`, f.message, "transactions");
+        `${gbp(f.evidence)} a year arrives in the bank; Open Banking can't show profit.`, "taken", f.party, ["path:" + f.path]);
+      else if (f.path.endsWith(".uncategorised")) flag("CHECK", `Transactions not yet categorised (${gbp(f.evidence)} out)`, f.message, "transactions", "", ["hl:to-categorise"]);
       else if (f.outcome === "UNVERIFIABLE") flag("CHECK", f.message.split(". ")[0].replace(/\.$/, "") + ".", "", "taken",
-                                                  /^applicants\[/.test(f.path) && f.path.includes(".income") ? f.party : "");
-      else if (f.outcome === "ALERT" && !adverse.includes(f) && f !== gambling) flag("CHECK", f.message, "", "taken");
+                                                  /^applicants\[/.test(f.path) && f.path.includes(".income") ? f.party : "", ["path:" + f.path]);
+      else if (f.outcome === "ALERT" && !adverse.includes(f) && f !== gambling) flag("CHECK", f.message, "", "taken", "", ["path:" + f.path]);
     });
     return out.sort((a, b) => FLAG_ORDER[a.level] - FLAG_ORDER[b.level]);
   }
@@ -1013,7 +1025,7 @@
     const s = c.factfind.data.summary || {}, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
     return `<div class="panel summary-panel ${act ? "act" : check ? "check" : "ok"}">
       <span class="small muted">${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month · ${E.glance(c).backed} of ${E.glance(c).total} figures from the reports</span>
-      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#credit" data-open-credit>${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link>${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
+      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#credit" data-open-credit data-credit-query="${esc(f.query)}">${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
   }
 
   // The Show bar in two rows (cases/screens.picker): the household and each
@@ -1184,7 +1196,7 @@
           <td class="mono">${esc(a.sort_code || "–")}</td><td class="mono">${esc(a.number || "–")}</td>
           <td class="num">${a.balance === null || a.balance === undefined ? '<span class="muted">–</span>' : `<strong>${gbp(a.balance)}</strong>`}</td></tr>`).join("")}</tbody></table></div>`;
       const overview = `<h3 class="sub-band">${b.business ? "Money in and out" : "Standard affordability"} <span class="muted">· ${n} complete month${n === 1 ? "" : "s"}</span></h3>
-        <div class="table-wrap"><table>${head(r, "Overview")}<tbody>${r.overview.map((x) => `<tr${x.bold ? ' class="strong"' : ""}><td>${esc(x.label)}</td>${x.months.map((v) => `<td class="num">${gbp(v)}</td>`).join("")}<td class="num">${gbp(x.total)}</td><td class="num"><strong>${gbp(x.average)}</strong></td></tr>`).join("")}</tbody></table></div>
+        <div class="table-wrap"><table>${head(r, "Overview")}<tbody>${r.overview.map((x) => `<tr${x.bold ? ' class="strong" data-hl="disposable"' : ""}><td>${esc(x.label)}</td>${x.months.map((v) => `<td class="num">${gbp(v)}</td>`).join("")}<td class="num">${gbp(x.total)}</td><td class="num"><strong>${gbp(x.average)}</strong></td></tr>`).join("")}</tbody></table></div>
         ${r.chart ? `<figure class="chart-box">${E.chartSvg(r.chart)}<figcaption><span class="key key-in"></span>${b.business ? "Money in" : "Income"} <span class="key key-out"></span>${b.business ? "Money out" : "Expenditure"} <span class="key key-left"></span>${b.business ? "Net" : "Left over"}</figcaption></figure>` : ""}`;
       let which = "";
       if (h) {
@@ -1204,7 +1216,7 @@
                   ["expenditure", "Full expenditure breakdown", r.expenditure, r.expenditureTotal, "No spending identified."]]
           .map(([kind, title, rows, total, empty]) => `<h3 class="sub-band">${title}</h3>
           <div class="table-wrap"><table>${head(r, 'Primary category<br><span class="muted" style="font-weight:400">sub category</span>')}<tbody>
-          ${rows.map((x) => `<tr class="primary-row"><td>${esc(x.primary)}${kind === "income" && x.primary === "Salary" && b.verify ? " " + verifyHtml(c, b.verify) : ""}</td>${money(x)}</tr>`
+          ${rows.map((x) => `<tr class="primary-row" data-hl="cat:${esc(x.primary)}"><td>${esc(x.primary)}${kind === "income" && x.primary === "Salary" && b.verify ? " " + verifyHtml(c, b.verify) : ""}</td>${money(x)}</tr>`
             + x.subs.map((s) => `<tr class="sub-row"><td>${esc(s.sub)}</td>${money(s)}</tr>`).join("")).join("") || `<tr><td colspan="99" class="small muted">${empty}</td></tr>`}
           <tr class="strong"><td>Total</td>${money(total)}</tr></tbody></table></div>`).join("");
         tables += `<details style="margin-top:12px" class="payments-detail"><summary>Sub category breakdown: the last 30 and 90 days</summary>
@@ -1215,7 +1227,7 @@
       }
       const k = b.credit;
       const credit = k ? `<h3 class="sub-band">Credit commitments <span class="muted">· from the credit report, beside what the bank shows paid</span></h3>
-        <div class="table-wrap"><table><thead><tr><th>Lender</th><th>Whose</th><th>Type</th><th class="num">Balance</th><th class="num">Limit</th><th class="num">Monthly (credit report)</th><th class="num">Paid from the bank a month</th></tr></thead>
+        <div class="table-wrap" data-hl="credit-commitments"><table><thead><tr><th>Lender</th><th>Whose</th><th>Type</th><th class="num">Balance</th><th class="num">Limit</th><th class="num">Monthly (credit report)</th><th class="num">Paid from the bank a month</th></tr></thead>
         <tbody>${k.rows.map((r) => `<tr data-src="all person:${esc(r.owner)} credit:${esc(r.owner)}"><td><strong>${esc(r.lender)}</strong></td><td>${esc(r.who)}</td><td>${esc(r.type)}</td>
           <td class="num">${gbp(r.balance)}</td><td class="num">${r.limit ? gbp(r.limit) : '<span class="muted">–</span>'}</td>
           <td class="num"><strong>${gbp(r.monthly)}</strong></td><td class="num">${r.bank ? gbp(r.bank) : pill("difference", "NOT SEEN")}</td></tr>`).join("")}
@@ -1463,7 +1475,16 @@
     document.querySelectorAll("#credit-view [data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
     filter();
   }
-  function openCredit() { showView("credit"); renderCredit(); }
+  function openCredit(e) {
+    showView("credit"); renderCredit();
+    // A flag's link can open it filtered (record=missed, group=short...).
+    const asked = new URLSearchParams((e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.creditQuery) || "");
+    let any = false;
+    [["group", "cr-group"], ["status", "cr-status"], ["record", "cr-record"], ["person", "cr-person"]].forEach(([k, id]) => {
+      if (asked.get(k) && $(id)) { $(id).value = asked.get(k); any = true; }
+    });
+    if (any) $("cr-record").dispatchEvent(new Event("change"));
+  }
 
   // The credit reports with only the accounts and searches that match, and
   // the filters in words (affordability/creditfile.filter_files).
@@ -1513,6 +1534,19 @@
         </tbody></table></div></div>`).join("")}</div>`;
   }
 
+  // What a flag is about, briefly marked and brought into view (as the service's case page).
+  function highlight(targets, panel) {
+    const found = [];
+    targets.forEach((t) => {
+      const i = t.indexOf(":"), kind = t.slice(0, i), value = t.slice(i + 1);
+      const attr = kind === "path" ? "data-path" : kind === "finding" ? "data-finding" : "data-hl";
+      panel.querySelectorAll(`[${attr}="${CSS.escape(value)}"]`).forEach((el) => { if (el.offsetParent !== null) found.push(el); });
+    });
+    found.forEach((el) => { el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash"); });
+    if (found.length) window.scrollTo(0, found[0].getBoundingClientRect().top + window.scrollY - window.innerHeight / 3);
+    return found.length > 0;
+  }
+
   function renderCase() {
     const c = currentCase, ff = c.factfind;
     // Alerts and items to check are worth knowing, not decisions.
@@ -1544,7 +1578,7 @@
       const t = ts[0], dates = ts.map((x) => x.date).sort();
       const out = ts.reduce((s, x) => s + Math.max(0, -E.num(x.amount)), 0);
       const inn = ts.reduce((s, x) => s + Math.max(0, E.num(x.amount)), 0);
-      return `<div class="panel finding difference" data-src="all acct:${esc(t.account || "")}">
+      return `<div class="panel finding difference" data-src="all acct:${esc(t.account || "")}" data-hl="to-categorise">
         <div class="finding-head">${pill("difference", "TO CATEGORISE")}<span class="finding-source">${esc(names[t.party] || t.party)}${t.provider ? " · provider: " + esc(t.provider) : ""}</span></div>
         <div class="finding-text"><strong>${esc(t.description)}</strong></div>
         <div class="figures"><div><div class="fig-label">Payments</div><div class="fig-value">${ts.length} <span class="small muted">· ${esc(ts.length > 1 ? dates[0] + " to " + dates[dates.length - 1] : dates[0])}</span></div></div>
@@ -1643,7 +1677,10 @@
     document.querySelectorAll('#case-view a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => {
       const target = document.getElementById(a.getAttribute("href").slice(1)), where = target && target.closest(".tab-panel");
       if (!where) return;
-      e.preventDefault(); showTab(where.dataset.tab); target.scrollIntoView();
+      e.preventDefault(); showTab(where.dataset.tab);
+      const targets = (a.dataset.targets || "").split(" ").filter(Boolean);
+      // Once the source picker shows everything (a flag resets it), light up what the flag is about.
+      setTimeout(() => { if (!highlight(targets, where)) target.scrollIntoView(); }, 0);
     }));
     document.querySelectorAll("[data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
     document.querySelectorAll("[data-open-credit]").forEach((b) => b.addEventListener("click", openCredit));
