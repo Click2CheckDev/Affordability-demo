@@ -1021,10 +1021,13 @@
   const FLAG_WORD = { ACT: "Action", CHECK: "Review", OK: "OK" };
   const flagPill = (level) => `<span class="flag flag-${level}">${FLAG_WORD[level]}</span>`;
   function summaryHtml(c) {
-    const found = flagsFor(c), act = found.some((f) => f.level === "ACT"), check = found.some((f) => f.level === "CHECK");
+    // What needs action or a review; what was checked and is fine is one line, only when nothing else is.
+    const every = flagsFor(c), found = every.filter((f) => f.level !== "OK"), act = found.some((f) => f.level === "ACT"), check = found.some((f) => f.level === "CHECK");
     const s = c.factfind.data.summary || {}, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
     return `<div class="panel summary-panel ${act ? "act" : check ? "check" : "ok"}">
       <span class="small muted">${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month · ${E.glance(c).backed} of ${E.glance(c).total} figures from the reports</span>
+      ${found.length ? "" : `<p style="margin:10px 0 0">${flagPill("OK").replace(">OK<", ">No issues found<")}
+        <span class="small muted">Checked: ${esc(every.map((f) => f.title).join("; "))}.</span></p>`}
       <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#credit" data-open-credit data-credit-query="${esc(f.query)}">${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
   }
 
@@ -1894,7 +1897,10 @@
       if (!only) {
       // What the adviser needs to know, first.
       section("Summary");
-      table(["", "What to know"], flagsFor(c).map((f) => [{ content: FLAG_WORD[f.level], styles: { fontStyle: "bold",
+      const issues = flagsFor(c).filter((f) => f.level !== "OK");
+      if (!issues.length) table(null, [[{ content: "No issues found.", styles: { fontStyle: "bold" } },
+        "Checked: " + flagsFor(c).map((f) => f.title).join("; ") + "."]], { columns: { 0: { cellWidth: 100 } } });
+      else table(["", "What to know"], issues.map((f) => [{ content: FLAG_WORD[f.level], styles: { fontStyle: "bold",
         textColor: f.level === "ACT" ? [163, 15, 63] : f.level === "CHECK" ? [138, 90, 6] : [31, 122, 99] } },
         f.title + (f.detail ? "\n" + f.detail : "")]), { columns: { 0: { cellWidth: 50 } } });
 
