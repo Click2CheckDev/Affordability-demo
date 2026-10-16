@@ -466,6 +466,31 @@
   .btn-verify { width: auto; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
                 background: #fff; color: var(--brand); border: 1px solid var(--brand); margin-left: 6px; }
   .statement td { padding-top: 7px; padding-bottom: 7px; }
+  /* The landing page (cases/base.html) */
+  .landing-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 8px 0 4px; }
+  .landing-tile { width: auto; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; font: inherit;
+                  padding: 16px 18px; border: 1px solid var(--border); border-left: 4px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); }
+  .landing-tile:hover, .landing-tile.active { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .landing-tile.active { outline: 2px solid var(--brand); }
+  .landing-tile .n { font-size: 30px; font-weight: 500; line-height: 1.1; }
+  .landing-tile .t { font-weight: 600; font-size: 14px; }
+  .landing-tile .s { font-size: 12px; color: var(--muted); }
+  .landing-tile.act { border-left-color: var(--brand); } .landing-tile.act .n { color: var(--brand-ink); }
+  .landing-tile.check { border-left-color: #e0961e; } .landing-tile.check .n { color: #8a5a06; }
+  .landing-tile.ok { border-left-color: var(--teal); } .landing-tile.ok .n { color: var(--teal-ink); }
+  .landing-tile.done { border-left-color: var(--muted); }
+  .landing-h2 { font-size: 17px; font-weight: 600; color: var(--ink); margin: 24px 0 10px; }
+  .landing-start { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .landing-card { width: auto; text-align: left; cursor: pointer; font: inherit; display: flex; flex-direction: column; gap: 6px;
+                  padding: 16px 18px; border: 1px solid var(--border); border-top: 4px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); }
+  .landing-card.act { border-top-color: var(--brand); } .landing-card.check { border-top-color: #e0961e; }
+  .landing-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  .landing-card .flag { align-self: flex-start; }
+  .landing-card strong { font-size: 16px; }
+  .landing-flag { font-size: 13.5px; }
+  .landing-money { font-size: 13px; margin-top: auto; }
+  .landing-open { color: var(--brand); font-size: 13px; font-weight: 600; }
+  @media (max-width: 860px) { .landing-tiles, .landing-start { grid-template-columns: 1fr 1fr; } }
   /* The budget planner (cases/base.html) */
   .budget-switch { display: flex; gap: 2px; border-bottom: 1px solid #ececef; margin-bottom: 12px; }
   .budget-switch button { width: auto; height: 34px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
@@ -632,21 +657,22 @@
   <div id="portal-view" class="card portal-card">
     <div class="portal-header">
       <div>
-        <div class="eyebrow muted">Affordability · ABC Ltd</div>
-        <h1 class="title" style="font-size:26px;">Your cases</h1>
-        <p class="subtitle">Every case the C2C hub has opened for this firm. A case arrives once the customer has consented and their credit report and Open Banking are in, already built from them: the household's income and outgoings added up across every account.</p>
+        <div class="eyebrow muted">Affordability · from the C2C Hub</div>
+        <h1 class="title" style="font-size:28px;" id="landing-greeting">Your cases</h1>
+        <p class="subtitle" id="landing-intro"></p>
       </div>
     </div>
-    <div class="stat-row four">
-      <div class="stat-box brand"><div class="stat-value" id="stat-total"></div><div class="stat-label">Cases</div></div>
-      <div class="stat-box"><div class="stat-value" id="stat-review"></div><div class="stat-label">Broker review</div></div>
-      <div class="stat-box teal"><div class="stat-value" id="stat-complete"></div><div class="stat-label">Complete</div></div>
-      <div class="stat-box"><div class="stat-value" id="stat-types"></div><div class="stat-label">Residential · commercial</div></div>
+    <div class="landing-tiles">
+      <button class="landing-tile act" data-level="ACT"><span class="n" id="tile-act"></span><span class="t">Action required</span><span class="s">something to deal with first</span></button>
+      <button class="landing-tile check" data-level="CHECK"><span class="n" id="tile-check"></span><span class="t">Review recommended</span><span class="s">worth a look before approving</span></button>
+      <button class="landing-tile ok" data-level="OK"><span class="n" id="tile-ok"></span><span class="t">No issues found</span><span class="s">ready to approve</span></button>
+      <button class="landing-tile done" data-level="DONE"><span class="n" id="tile-done"></span><span class="t">Approved</span><span class="s">fact find approved</span></button>
     </div>
+    <div id="landing-start"></div>
+    <h2 class="landing-h2">All cases</h2>
     <div class="inline-form" style="margin:0 0 12px">
       <input type="text" id="case-search" placeholder="Search by name or reference" />
-      <select id="case-attention"><option value="">Every case</option><option value="yes">Needs attention</option><option value="no">No issues found</option></select>
-      <select id="case-state"><option value="">Any status</option><option value="REVIEW">Broker review</option><option value="COMPLETE">Complete</option></select>
+      <select id="case-attention"><option value="">Every case</option><option value="ACT">Action required</option><option value="CHECK">Review recommended</option><option value="OK">No issues found</option><option value="DONE">Approved</option></select>
       <select id="case-type"><option value="">Residential and commercial</option><option value="RESIDENTIAL">Residential</option><option value="COMMERCIAL">Commercial</option></select>
       <span class="small muted" id="case-count"></span>
     </div>
@@ -810,19 +836,39 @@
   // ---- case list --------------------------------------------------------------------------
   // Each case with the household's figures and its sources, so the list
   // says what each case is at a glance (as the service's Cases page).
+  // The landing page (cases/templates/cases/list.html): from the Hub, what
+  // needs the adviser first, then every case.
+  const caseLevel = (c) => {
+    if (c.status === "COMPLETE") return "DONE";
+    const levels = new Set(flagsFor(c).map((f) => f.level));
+    return levels.has("ACT") ? "ACT" : levels.has("CHECK") ? "CHECK" : "OK";
+  };
   function renderPortal() {
-    const count = (st) => state.cases.filter((c) => c.status === st).length;
-    $("stat-total").textContent = state.cases.length;
-    $("stat-review").textContent = count("REVIEW");
-    $("stat-complete").textContent = count("COMPLETE");
-    $("stat-types").textContent = `${state.cases.filter((c) => c.type === "RESIDENTIAL").length} · ${state.cases.filter((c) => c.type === "COMMERCIAL").length}`;
+    const hour = new Date().getHours(), first = WHO.split(" ")[0];
+    $("landing-greeting").textContent = `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${first}`;
+    $("landing-intro").textContent = `${state.cases.length} cases from the Hub. Each arrives with the customer's consent, credit report and Open Banking, already put together and checked. Start with what needs action.`;
+    const levels = state.cases.map(caseLevel);
+    ["ACT", "CHECK", "OK", "DONE"].forEach((k) => { $("tile-" + k.toLowerCase()).textContent = levels.filter((l) => l === k).length; });
+    // Start here: what needs the adviser most, worst first.
+    const start = state.cases.map((c, i) => ({ c: c, i: i, level: levels[i], flags: flagsFor(c).filter((f) => f.level !== "OK") }))
+      .filter((x) => x.level === "ACT" || x.level === "CHECK")
+      .sort((a, b) => (a.level === "ACT" ? 0 : 1) - (b.level === "ACT" ? 0 : 1) || b.flags.length - a.flags.length).slice(0, 3);
+    $("landing-start").innerHTML = start.length ? `<h2 class="landing-h2">Start here</h2><div class="landing-start">${start.map((x) => `
+      <button class="landing-card ${x.level.toLowerCase()}" data-start="${x.i}">
+        ${flagPill(x.level).replace(">Action<", ">Action required<").replace(">Review<", ">Review recommended<")}
+        <strong>${esc(caseTitle(x.c))}</strong>
+        <span class="small muted">${esc(x.c.reference)} · ${esc(label(x.c.type))} · opened ${esc(new Date(x.c.opened).toLocaleDateString("en-GB"))}</span>
+        <span class="landing-flag">${esc(x.flags[0].title)}${x.flags.length > 1 ? ` <span class="muted">and ${x.flags.length - 1} more</span>` : ""}</span>
+        <span class="landing-money"><span class="muted">Disposable a month</span> <strong>${gbp(x.c.factfind.data.summary.disposable_monthly)}</strong></span>
+        <span class="landing-open">Open case →</span></button>`).join("")}</div>` : "";
+    document.querySelectorAll("[data-start]").forEach((b) => b.addEventListener("click", () => openCase(state.cases[+b.dataset.start])));
     $("case-list").innerHTML = state.cases.map((c, i) => {
       const s = c.factfind.data.summary, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
       const accounts = Object.values(c.accounts).reduce((n, acc) => n + acc.accounts.length, 0);
       const credit = c.pack.parties.filter((p) => p.credit).length;
       const attention = flagsFor(c).filter((f) => f.level !== "OK");
       const search = [caseTitle(c), c.reference].concat(people).join(" ").toLowerCase();
-      return `<tr data-i="${i}" data-search="${esc(search)}" data-state="${esc(c.status)}" data-type="${esc(c.type)}" data-attention="${attention.length ? "yes" : ""}">
+      return `<tr data-i="${i}" data-search="${esc(search)}" data-type="${esc(c.type)}" data-level="${levels[i]}">
         <td><strong>${esc(caseTitle(c))}</strong><br><span class="small muted"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span>
           <span style="white-space:nowrap">${esc(c.reference)}</span>${people.length > 1 || c.type === "COMMERCIAL" ? " · " + esc(people.join(", ")) : ""}
           <br>${accounts} account${accounts === 1 ? "" : "s"} · ${credit} credit report${credit === 1 ? "" : "s"} · opened ${esc(new Date(c.opened).toLocaleDateString("en-GB"))}</span></td>
@@ -838,18 +884,24 @@
   }
   function filterCases() {
     const words = $("case-search").value.toLowerCase().split(/\s+/).filter(Boolean);
-    const st = $("case-state").value, ty = $("case-type").value, at = $("case-attention").value;
+    const ty = $("case-type").value, at = $("case-attention").value;
     const rows = [...document.querySelectorAll("#case-list tr")]; let shown = 0;
     rows.forEach((r) => {
-      const on = words.every((w) => r.dataset.search.includes(w)) && (!st || r.dataset.state === st) && (!ty || r.dataset.type === ty)
-        && (!at || (at === "yes") === !!r.dataset.attention);
+      const on = words.every((w) => r.dataset.search.includes(w)) && (!ty || r.dataset.type === ty) && (!at || r.dataset.level === at);
       r.style.display = on ? "" : "none"; if (on) shown++;
     });
-    $("case-count").textContent = words.length || st || ty || at ? `${shown} of ${rows.length}` : "";
+    $("case-count").textContent = words.length || ty || at ? `${shown} of ${rows.length}` : "";
+    document.querySelectorAll(".landing-tile").forEach((t) => t.classList.toggle("active", t.dataset.level === at));
   }
-  ["case-search", "case-state", "case-type", "case-attention"].forEach((id) => {
+  ["case-search", "case-type", "case-attention"].forEach((id) => {
     $(id).addEventListener("input", filterCases); $(id).addEventListener("change", filterCases);
   });
+  // A tile shows those cases in the list (and again to show every case).
+  document.querySelectorAll(".landing-tile").forEach((t) => t.addEventListener("click", () => {
+    $("case-attention").value = $("case-attention").value === t.dataset.level ? "" : t.dataset.level;
+    filterCases();
+    $("case-search").scrollIntoView({ behavior: "smooth", block: "center" });
+  }));
 
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
