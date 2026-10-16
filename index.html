@@ -466,6 +466,18 @@
   .btn-verify { width: auto; font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 3px; cursor: pointer;
                 background: #fff; color: var(--brand); border: 1px solid var(--brand); margin-left: 6px; }
   .statement td { padding-top: 7px; padding-bottom: 7px; }
+  /* The Hub case this affordability belongs to, and its checks (cases/base.html) */
+  .hub-crumbs { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+  .hub-crumbs .link-button { color: var(--muted); font-size: 13px; }
+  .hub-modules { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .hub-module { width: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 128px; padding: 8px 12px;
+                border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; font-size: 13px; text-align: left; }
+  button.hub-module { cursor: pointer; } button.hub-module:hover { border-color: var(--brand); }
+  .hub-module.active { border: 2px solid var(--brand); padding: 7px 11px; }
+  .hub-module .name { font-weight: 600; }
+  .hub-module .state { font-size: 12px; }
+  .hub-module .state.ok { color: var(--teal-ink); } .hub-module .state.act { color: var(--brand-ink); }
+  .hub-module .state.check, .hub-module .state.wait { color: #8a5a06; } .hub-module .state.hub { color: var(--muted); }
   /* The landing page (cases/base.html) */
   .landing-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 8px 0 4px; }
   .landing-tile { width: auto; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 2px; font: inherit;
@@ -846,7 +858,7 @@
   function renderPortal() {
     const hour = new Date().getHours(), first = WHO.split(" ")[0];
     $("landing-greeting").textContent = `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${first}`;
-    $("landing-intro").textContent = `${state.cases.length} cases from the Hub. Each arrives with the customer's consent, credit report and Open Banking, already put together and checked. Start with what needs action.`;
+    $("landing-intro").textContent = `${state.cases.length} cases from the Hub. In the Hub, affordability is one of a case's checks, beside AML, ID, Open Banking, the credit report and HMRC: each case here arrives with the customer's consent, credit report and Open Banking, already put together and checked. Start with what needs action.`;
     const levels = state.cases.map(caseLevel);
     ["ACT", "CHECK", "OK", "DONE"].forEach((k) => { $("tile-" + k.toLowerCase()).textContent = levels.filter((l) => l === k).length; });
     // Start here: what needs the adviser most, worst first.
@@ -1634,6 +1646,24 @@
         </tbody></table></div></div>`).join("")}</div>`;
   }
 
+  // The Hub case's checks, affordability among them (cases/screens.hub_modules).
+  function hubModules(c) {
+    const accounts = Object.values(c.accounts).reduce((n, acc) => n + acc.accounts.length, 0);
+    const credit = c.pack.parties.filter((p) => p.credit).length;
+    const levels = new Set(flagsFor(c).map((f) => f.level));
+    const sent = Object.keys(c.verify || {}).length;
+    const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+    return [
+      { name: "AML", state: "In the Hub", level: "hub" },
+      { name: "ID check", state: "In the Hub", level: "hub" },
+      { name: "Open Banking statement", state: accounts ? plural(accounts, "account") : "To come", level: accounts ? "ok" : "wait", open: "data-open-statement" },
+      { name: "Credit report", state: credit ? plural(credit, "report") : "To come", level: credit ? "ok" : "wait", open: "data-open-credit" },
+      { name: "HMRC", state: sent ? "Sent to verify" : "Not requested", level: sent ? "wait" : "hub" },
+      { name: "Affordability", active: true, state: levels.has("ACT") ? "Action required" : levels.has("CHECK") ? "Review recommended" : "No issues found",
+        level: levels.has("ACT") ? "act" : levels.has("CHECK") ? "check" : "ok" },
+    ];
+  }
+
   function renderCase() {
     const c = currentCase, ff = c.factfind;
     // Alerts and items to check are worth knowing, not decisions.
@@ -1693,16 +1723,16 @@
       <td class="small muted">${esc(o.by)} · ${esc(shortTime(o.at))}</td></tr>`).join("");
 
     $("case-view").innerHTML = `
-      <button class="back-link" id="case-back">&larr; All cases</button>
+      <nav class="hub-crumbs"><span>C2C Hub</span> › <button class="link-button" id="case-back">Cases</button> › <span>Case ${esc(c.reference)}</span></nav>
       ${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
       <div class="detail-head"><div>
-        <div class="eyebrow muted">${esc(c.reference)}</div>
         <h1 class="title">${esc(caseTitle(c))}</h1></div></div>
       <p class="case-meta"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span> ${statusPill(c)}
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
-      <div class="case-actions">
-        <button class="btn-secondary" data-open-statement>Open Banking statement</button>
-        <button class="btn-secondary" data-open-credit>Credit report</button>
+      <nav class="hub-modules" aria-label="This case's checks">${hubModules(c).map((m) => m.open
+        ? `<button class="hub-module" ${m.open} title="Open the ${esc(m.name)} for this case"><span class="name">${esc(m.name)}</span><span class="state ${m.level}">${esc(m.state)}</span></button>`
+        : `<span class="hub-module${m.active ? " active" : ""}"${m.active ? "" : ' title="In the C2C Hub"'}><span class="name">${esc(m.name)}</span><span class="state ${m.level}">${esc(m.state)}</span></span>`).join("")}</nav>
+      <div class="case-actions" style="margin-top:12px">
         <button class="btn-secondary" id="dl-report">Full report (PDF)</button>
       </div>
       <div class="case-bar">${pickerHtml(c)}
