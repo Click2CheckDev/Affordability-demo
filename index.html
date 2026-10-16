@@ -536,6 +536,11 @@
   #case-view h2[id] { scroll-margin-top: 70px; }
   .case-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
   .case-actions button { width: auto; padding: 9px 16px; font-size: 13px; }
+  .flag-note { font-size: 13px; margin: 4px 0 0; padding: 4px 8px; border-left: 3px solid var(--border-strong); background: #fafafb; color: var(--ink); }
+  .flag-add summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+  .flag-add .inline-form { margin-top: 4px; }
+  .freshness { margin: -10px 0 14px; font-size: 13px; }
+  .freshness .stale { color: var(--brand); font-weight: 500; }
   .link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--brand); cursor: pointer; text-align: left; text-decoration: underline; }
   .inline-form select { max-width: 220px; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -960,7 +965,7 @@
     const left = num(s.disposable_monthly);
     const money = `Net income ${gbp(income)}, outgoings ${gbp(s.monthly_expenditure)}.`;
     if (left < 0) flag("ACT", `Spends more than comes in: ${gbp(left)} a month`, money, "income", "", ["hl:disposable"]);
-    else if (income && left < income * 0.10) flag("CHECK", `Little left over: ${gbp(left)} a month (${pct(left, income)} of income)`, money, "income", "", ["hl:disposable"]);
+    else if (income && left < income * 0.10) flag("CHECK", `${gbp(left)} a month left over (${pct(left, income)} of income)`, money, "income", "", ["hl:disposable"]);
     else flag("OK", `${gbp(left)} a month left over (${pct(left, income)} of income)`, money, "income", "", ["hl:disposable"]);
     const repay = num(s.monthly_commitments);
     if (income && repay) {
@@ -986,7 +991,7 @@
            "Regular payments to gambling sites in the bank statements.", "income", "", ["hl:cat:Gambling", "path:expenditure.gambling"]);
     } else if (c.transactions.length) flag("OK", "No regular gambling", "", "transactions");
     const undisclosed = taken.filter((f) => f.action === "ADD_COMMITMENT");
-    if (undisclosed.length) flag("CHECK", `Customer didn't mention ${undisclosed.length} credit agreement${undisclosed.length > 1 ? "s" : ""}`,
+    if (undisclosed.length) flag("CHECK", `${undisclosed.length} credit agreement${undisclosed.length > 1 ? "s" : ""} on the credit report the customer didn't list`,
       "Added from the credit report: " + undisclosed.map((f) => `${((f.extra || {}).row || {}).lender || "a lender"} ${gbp(f.proposed)} a month`).join(", ") + ".", "taken", "",
       undisclosed.map((f) => "finding:" + f.id));
     const label = (path) => {
@@ -997,38 +1002,68 @@
     const outgoings = taken.filter((f) => f.action !== "ADD_COMMITMENT" && /^(expenditure\.|commitments\[)/.test(f.path) && num(f.proposed) > num(f.declared));
     if (outgoings.length) {
       const more = outgoings.reduce((t, f) => t + num(f.proposed) - num(f.declared), 0);
-      flag("CHECK", `Customer understated outgoings by ${gbp(more)} a month`,
+      flag("CHECK", `Outgoings in the reports are ${gbp(more)} a month more than the customer said`,
            "Taken from the reports instead: " + outgoings.map((f) => `${label(f.path)} ${gbp(f.declared)} → ${gbp(f.proposed)}`).join(", ") + ".", "taken", "",
            outgoings.map((f) => "path:" + f.path));
     }
     const earnings = taken.filter((f) => /^(company\.|applicants\[)/.test(f.path) && num(f.proposed) < num(f.declared));
-    earnings.forEach((f) => flag("CHECK", `Customer overstated ${f.path.startsWith("company.") ? "turnover" : "income"} by ${gbp(num(f.declared) - num(f.proposed))}`, f.message, "taken",
+    earnings.forEach((f) => flag("CHECK", `${f.path.startsWith("company.") ? "Turnover" : "Income"} in the reports is ${gbp(num(f.declared) - num(f.proposed))} less than the customer said`, f.message, "taken",
                                  f.path.startsWith("company.") ? "" : f.party, ["path:" + f.path]));
-    if (!undisclosed.length && !outgoings.length && !earnings.length && c.findings.length) flag("OK", "Nothing hidden or understated by the customer", "", "taken");
+    if (!undisclosed.length && !outgoings.length && !earnings.length && c.findings.length) flag("OK", "The customer's figures match the reports", "", "taken");
     const deciding = open.filter((f) => f.outcome === "DIFFERENCE");
-    if (deciding.length) flag("ACT", `${deciding.length} difference${deciding.length > 1 ? "s" : ""} to decide`, deciding[0].message, "decide", "",
+    if (deciding.length) flag("ACT", `${deciding.length} figure${deciding.length > 1 ? "s" : ""} where the customer and the reports differ`, deciding[0].message, "decide", "",
                               deciding.map((f) => "finding:" + f.id));
     open.forEach((f) => {
-      if (f.path.endsWith(".self_employed_profit")) flag("CHECK", "Self-employed profit needs the SA302 to check",
+      if (f.path.endsWith(".self_employed_profit")) flag("CHECK", "Self-employed profit isn't in the bank data: the SA302 would show it",
         `${gbp(f.evidence)} a year arrives in the bank; Open Banking can't show profit.`, "taken", f.party, ["path:" + f.path]);
       else if (f.path.endsWith(".uncategorised")) flag("CHECK", `Transactions not yet categorised (${gbp(f.evidence)} out)`, f.message, "transactions", "", ["hl:to-categorise"]);
       else if (f.outcome === "UNVERIFIABLE") flag("CHECK", f.message.split(". ")[0].replace(/\.$/, "") + ".", "", "taken",
                                                   /^applicants\[/.test(f.path) && f.path.includes(".income") ? f.party : "", ["path:" + f.path]);
       else if (f.outcome === "ALERT" && !adverse.includes(f) && f !== gambling) flag("CHECK", f.message, "", "taken", "", ["path:" + f.path]);
     });
+    // Beyond the figures: events in the bank data, credit ending, pay, how fresh (exported from affordability/insights.py).
+    const ins = c.insights || {};
+    (ins.events || []).forEach((e) => flag(e.level, `${e.title} (${e.who})`, e.detail, "income", "", ["hl:event:" + e.n]));
+    if ((ins.ending || []).length) flag("CHECK", "Credit ending: " + ins.ending.map((r) => `${r.lender} ${gbp(r.monthly)} a month, ${r.ends}`).join("; "),
+      `${ins.ending.length} agreement${ins.ending.length > 1 ? "s" : ""} on the credit report end, by start date and term.`, "income", "", ["hl:ending"]);
+    (ins.pattern || []).forEach((p) => p.sources.forEach((s2) => {
+      if (["Salary", "Pension", "Benefits"].includes(s2.kind) && s2.moves >= 20)
+        flag("CHECK", `${s2.payer} varies: ${gbp(s2.low)} to ${gbp(s2.high)} a month (${p.who})`,
+             `Usually ${gbp(s2.usual)}; moves ${s2.moves}% between months.${s2.high_months.length ? ` Higher in ${s2.high_months.join(", ")}.` : ""}`, "income", "", ["hl:pattern:" + p.party]);
+    }));
+    (ins.freshness || []).filter((f) => f.stale).forEach((f) => flag("CHECK", `${f.source} for ${f.who} is ${f.days} days old`,
+      `Dated ${f.date}; a newer one would show the latest.`, "sources"));
     return out.sort((a, b) => FLAG_ORDER[a.level] - FLAG_ORDER[b.level]);
   }
-  const FLAG_WORD = { ACT: "Action", CHECK: "Review", OK: "OK" };
+  // Information for the adviser, not decisions.
+  const FLAG_WORD = { ACT: "Worth a look", CHECK: "For information", OK: "OK" };
   const flagPill = (level) => `<span class="flag flag-${level}">${FLAG_WORD[level]}</span>`;
   function summaryHtml(c) {
-    // What needs action or a review; what was checked and is fine is one line, only when nothing else is.
+    // What is worth a look or worth knowing; what was checked and is fine is one line, only when nothing else is.
     const every = flagsFor(c), found = every.filter((f) => f.level !== "OK"), act = found.some((f) => f.level === "ACT"), check = found.some((f) => f.level === "CHECK");
     const s = c.factfind.data.summary || {}, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
     return `<div class="panel summary-panel ${act ? "act" : check ? "check" : "ok"}">
       <span class="small muted">${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month · ${E.glance(c).backed} of ${E.glance(c).total} figures from the reports</span>
-      ${found.length ? "" : `<p style="margin:10px 0 0">${flagPill("OK").replace(">OK<", ">No issues found<")}
+      ${found.length ? "" : `<p style="margin:10px 0 0">${flagPill("OK").replace(">OK<", ">Nothing to note<")}
         <span class="small muted">Checked: ${esc(every.map((f) => f.title).join("; "))}.</span></p>`}
-      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#credit" data-open-credit data-credit-query="${esc(f.query)}">${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}</span></li>`).join("")}</ul></div>`;
+      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#credit" data-open-credit data-credit-query="${esc(f.query)}">${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}${flagNotes(c, f)}</span></li>`).join("")}</ul></div>
+      ${notesPanel(c)}`;
+  }
+  // The adviser's notes: against a flag, or on the case. Kept with the case and in the full report.
+  function flagNotes(c, f) {
+    const notes = liveNotes(c, "NOTE").filter((n) => n.about === f.title);
+    return notes.map((n) => `<div class="flag-note">“${esc(n.text)}” <span class="muted">· ${esc(n.by)}, ${esc(shortTime(n.at))}</span></div>`).join("")
+      + (c.status === "COMPLETE" ? "" : `<details class="flag-add"><summary>Add a note</summary><div class="inline-form">
+        <input type="text" data-note-text placeholder="Your note" style="min-width:260px"><button class="btn-secondary" data-note-add data-note-about="${esc(f.title)}">Save</button></div></details>`);
+  }
+  function notesPanel(c) {
+    const notes = liveNotes(c, "NOTE"), complete = c.status === "COMPLETE";
+    return `<div class="panel" style="margin-top:12px"><strong>Adviser notes</strong> <span class="small muted">· kept with the case and in the full report</span>
+      ${notes.map((n) => `<div class="flag-note">${n.about ? `<span class="muted">On “${esc(n.about)}”:</span> ` : ""}${esc(n.text)}
+        <span class="muted">· ${esc(n.by)}, ${esc(shortTime(n.at))}</span>${complete ? "" : ` <button class="link-button small" data-note-remove="${esc(n.id)}">remove</button>`}</div>`).join("")
+        || '<p class="small muted" style="margin:6px 0 0">No notes yet.</p>'}
+      ${complete ? "" : `<div class="inline-form" style="margin-top:8px"><input type="text" data-note-text placeholder="A note on this case" style="flex:1;min-width:260px">
+        <button class="btn-secondary" data-note-add data-note-about="">Add note</button></div>`}</div>`;
   }
 
   // The Show bar in two rows (cases/screens.picker): the household and each
@@ -1162,7 +1197,13 @@
         .filter((a) => !account || a.id === account);
       // The credit report's commitments for these people, beside the bank (not for one account).
       const owed = (c.factfind.data.commitments || []).filter((k) => k && (keys.includes(k.owner) || (!k.owner && src.split(" ")[0] === "all")));
+      // What happened, what's changing and how pay moves (affordability/insights.py), for these people or this account.
+      const ins = c.insights || {};
+      const events = (ins.events || []).filter((e) => keys.includes(e.party) && (!account || !e.account || e.account === account));
+      const ending = account ? [] : (ins.ending || []).filter((x) => keys.includes(x.party));
+      const pattern = account ? [] : (ins.pattern || []).filter((x) => keys.includes(x.party));
       return { src: src, title: title, accounts: held, business: !!business, household: tables[src] || null,
+               events: events, ending: ending, pattern: pattern, whole: !account,
                verify: keys.length === 1 && !business ? keys[0] : null,
                credit: owed.length && !account ? E.creditCommitments(owed, txs, span, E.creditLimits(c.pack)) : null,
                report: E.bankReport(txs, span, business, end, D.category_paths) };
@@ -1236,10 +1277,39 @@
           <td class="num"><strong>${gbp(r.monthly)}</strong></td><td class="num">${r.bank ? gbp(r.bank) : pill("difference", "NOT SEEN")}</td></tr>`).join("")}
           <tr class="strong"><td colspan="5">Total credit commitments</td><td class="num">${gbp(k.monthly)}</td><td class="num">${gbp(k.bank)}</td></tr></tbody></table></div>
         ${k.unseen !== "0.00" || k.other !== "0.00" ? `<p class="small muted" style="margin:6px 14px 0">${k.unseen !== "0.00" ? `${gbp(k.unseen)} a month of commitments is not paid from a connected account: check where it is paid from. ` : ""}${k.other !== "0.00" ? `The bank also shows ${gbp(k.other)} a month to lenders not on the credit report.` : ""}</p>` : ""}` : "";
-      return `<div class="bank-report" data-src="${esc(b.src)}"><div class="band">${esc(b.title)}</div>${accounts}${overview}${which}${credit}${tables}</div>`;
+      return `<div class="bank-report" data-src="${esc(b.src)}"><div class="band">${esc(b.title)}</div>${accounts}${overview}${which}${credit}${insightHtml(c, b)}${tables}</div>`;
     }).join("");
     return `<div class="section src-group"><h2 id="income">Income and expenditure</h2>
       <p class="section-note">From the bank statements, laid out as a bank report. Household · all sources adds up every account in the household; pick a person or an account in Show to see theirs on its own.</p>${html}</div>`;
+  }
+
+  // Events in the bank data, what's changing and the income pattern: information for the adviser.
+  const monthlyText = (n) => n.monthly === null || n.monthly === undefined || n.monthly === "" ? "" : `${gbp(Math.abs(E.num(n.monthly)))} ${E.num(n.monthly) < 0 ? "less" : "more"}`;
+  const startsText = (v) => { const m = /^(\d{4})-(\d{2})$/.exec(v || ""); return m && +m[2] >= 1 && +m[2] <= 12 ? `${E.MONTHS[+m[2] - 1]} ${m[1]}` : (v || ""); };
+  const patternNote = (s) => `Moves ${s.moves}%` + (s.high_months.length ? `; higher in ${s.high_months.join(", ")}` : "") + (s.gaps.length ? `; nothing in ${s.gaps.join(", ")}` : "");
+  const liveNotes = (c, kind) => (c.notes || []).filter((n) => n.kind === kind && !n.withdrawn);
+  function insightHtml(c, b) {
+    const complete = c.status === "COMPLETE";
+    const events = b.events.length ? `<h3 class="sub-band">Events in the bank data <span class="muted">· what happened, for the adviser to weigh</span></h3>
+      <div class="table-wrap"><table><thead><tr><th>What</th><th>Detail</th><th>Whose</th></tr></thead><tbody>${b.events.map((e) => `
+        <tr data-hl="event:${e.n}"><td>${flagPill(e.level)} <strong>${esc(e.title)}</strong></td><td class="small muted">${esc(e.detail)}</td><td>${esc(e.who)}</td></tr>`).join("")}</tbody></table></div>` : "";
+    const changes = liveNotes(c, "CHANGE");
+    const changing = b.whole && !b.business ? `<h3 class="sub-band">What's changing <span class="muted">· credit ending, and changes the adviser knows about</span></h3>
+      <div class="table-wrap" data-hl="ending"><table><thead><tr><th>What</th><th>Whose</th><th class="num">£ a month</th><th>From</th><th></th></tr></thead><tbody>
+        ${b.ending.map((x) => `<tr><td><strong>${esc(x.lender)}</strong> <span class="muted">${esc(x.type)} ends</span></td><td>${esc(x.who)}</td>
+          <td class="num">${gbp(x.monthly)} less</td><td>${esc(x.ends)} <span class="muted">(${x.months_left} month${x.months_left === 1 ? "" : "s"})</span></td><td class="small muted">Credit report</td></tr>`).join("")}
+        ${changes.map((n) => `<tr><td><strong>${esc(n.text)}</strong></td><td></td><td class="num">${esc(monthlyText(n))}</td><td>${esc(startsText(n.starts))}</td>
+          <td class="small muted">Noted by ${esc(n.by)}${complete ? "" : ` <button class="link-button" data-note-remove="${esc(n.id)}">remove</button>`}</td></tr>`).join("")}
+        ${b.ending.length || changes.length ? "" : '<tr><td colspan="5" class="small muted">No credit ends, and no change noted.</td></tr>'}</tbody></table></div>
+      ${complete ? "" : `<details style="margin-top:8px"><summary class="small muted">Note a change you know is coming</summary>
+        <div class="inline-form" style="margin-top:6px"><input type="text" data-kc-text placeholder="What changes, e.g. Childcare ends" style="min-width:240px">
+          <input type="text" data-kc-monthly placeholder="£ a month (e.g. -350)" style="width:150px"><input type="month" data-kc-starts>
+          <button class="btn-secondary" data-kc-add>Add</button></div></details>`}` : "";
+    const pattern = b.pattern.length ? `<h3 class="sub-band">Income pattern <span class="muted">· how each payer's money moves month to month</span></h3>
+      ${b.pattern.map((p) => `<div class="table-wrap" data-hl="pattern:${esc(p.party)}"><table><thead><tr><th>${esc(p.who)}</th>${p.labels.map((m) => `<th class="num">${esc(m)}</th>`).join("")}<th class="num">Usual</th><th class="num">Lowest to highest</th><th>Notes</th></tr></thead>
+        <tbody>${p.sources.map((s) => `<tr><td><strong>${esc(s.payer)}</strong> <span class="muted">${esc(s.kind)}</span></td>${s.months.map((v) => `<td class="num">${gbp(v)}</td>`).join("")}
+          <td class="num">${gbp(s.usual)}</td><td class="num">${gbp(s.low)} – ${gbp(s.high)}</td><td class="small muted">${esc(patternNote(s))}</td></tr>`).join("")}</tbody></table></div>`).join("")}` : "";
+    return events + changing + pattern;
   }
 
   // ---- the statement: every transaction, as a page of its own (cases/statement.html) -----------
@@ -1523,7 +1593,8 @@
       <p class="section-note">The fact find as a budget planner: every figure from the bank statements and credit report, line by line, and what each is made of. Switch between the form and the CRM's categories.</p>
       <div class="budget-switch">${layouts.map((b) => `<button data-budget="${b.key}" class="${b.key === budgetLayout ? "active" : ""}">${esc(b.name)}</button>`).join("")}</div>
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
-        <p class="small muted" style="margin:0 0 8px">${esc(b.note)}</p>
+        <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
+          <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
         <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
           <tr class="budget-head"><td colspan="3">${b.key === "categories" ? "Household income" : "Income"}</td></tr>
           ${b.income.map((r) => `<tr${r.value === "0.00" ? ' class="budget-zero"' : ""}><td>${esc(r.label)}${r.before_tax ? `<br><span class="small muted">After tax; before tax ${gbp(r.before_tax)}</span>` : ""}</td>
@@ -1535,6 +1606,64 @@
             ${s.total ? `<tr class="budget-total"><td>${esc(s.total.label)}</td><td class="num">${gbp(s.total.value)}</td><td></td></tr>` : ""}`).join("")}
           <tr class="budget-result"><td>${esc(b.result.label)}</td><td class="num">${gbp(b.result.value)}</td><td></td></tr>
         </tbody></table></div></div>`).join("")}</div>`;
+  }
+
+  // How old each source is, under the case's details.
+  function freshnessHtml(c) {
+    const seen = {}, parts = [];
+    ((c.insights || {}).freshness || []).forEach((f) => { if (!seen[f.source]) { seen[f.source] = 1;
+      // The demo's sources are dated as the sample is, so an age only shows when it is worth saying.
+      parts.push(`${esc(f.source)} to ${esc(f.date)}${f.days ? ` <span class="${f.stale ? "stale" : ""}">(${f.days} day${f.days === 1 ? "" : "s"} old)</span>` : ""}`); } });
+    return parts.length ? `<p class="small muted freshness">${parts.join(" · ")}</p>` : "";
+  }
+
+  // The budget planner as an Excel file (cases/budget_excel.py): the layout's
+  // bands and lines, totals as formulas so it still adds up after an edit.
+  async function budgetXlsx(c, key) {
+    const b = E.budgetPlanner(c, key, D.budget_layouts, D.lines);
+    const wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet("Budget planner");
+    ws.getColumn(1).width = 70; ws.getColumn(2).width = 16; ws.getColumn(3).width = 26;
+    ws.getCell("A1").value = "Budget planner"; ws.getCell("A1").font = { bold: true, size: 14 };
+    ws.getCell("A2").value = "Client name: " + caseTitle(c); ws.getCell("B2").value = c.reference || "";
+    ws.getCell("A3").value = b.note; ws.getCell("A3").alignment = { wrapText: true };
+    ws.getCell("B4").value = "£ a month"; ws.getCell("C4").value = "From";
+    ws.getCell("B4").font = ws.getCell("C4").font = { bold: true, color: { argb: "FF7B7B7B" } };
+    const fill = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb: argb } });
+    let row = 5;
+    const band = (text) => {
+      ["A", "B", "C"].forEach((col) => { ws.getCell(col + row).fill = fill("FFCECCCC"); });
+      ws.getCell("A" + row).value = text; ws.getCell("A" + row).font = { bold: true }; row += 1;
+    };
+    const line = (labelText, value, origin, bold) => {
+      ws.getCell("A" + row).value = labelText;
+      ws.getCell("B" + row).value = typeof value === "string" && value.startsWith("=") ? { formula: value.slice(1) } : E.num(value);
+      ws.getCell("B" + row).numFmt = "£#,##0.00;-£#,##0.00";
+      ws.getCell("C" + row).value = origin || "";
+      ["A", "B", "C"].forEach((col) => {
+        const cell = ws.getCell(col + row);
+        cell.border = { bottom: { style: "thin", color: { argb: "FFD8D8D8" } } };
+        if (bold) { cell.font = { bold: true }; cell.fill = fill("FFF1F1F2"); }
+      });
+      row += 1; return row - 1;
+    };
+    const money = (v) => E.num(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    band(b.key === "categories" ? "Household income" : "Income");
+    const first = row;
+    b.income.forEach((r) => line(r.label + (r.before_tax ? ` (before tax ${money(r.before_tax)})` : ""), r.value, r.from.join(", ")));
+    const income = line("Total income", `=SUM(B${first}:B${row - 1})`, "", true);
+    const totals = [];
+    let start = row;
+    b.sections.forEach((s) => {
+      band(s.title);
+      if (start === null) start = row;
+      s.rows.forEach((r) => line(r.label + (r.made_of.length ? ` (${r.made_of.join(", ")})` : ""), r.value, r.from.join(", ")));
+      if (s.total) { totals.push(line(s.total.label, `=SUMIF(A${start}:A${row - 1},"<>*total*",B${start}:B${row - 1})`, "", true)); start = null; }
+    });
+    row += 1;
+    line(b.result.label, totals.length ? `=B${income}-` + totals.map((t) => "B" + t).join("-") : `=B${income}`, "", true);
+    const buffer = await wb.xlsx.writeBuffer();
+    download(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+             `${c.reference} budget planner (${b.name}).xlsx`);
   }
 
   // What a flag is about, briefly marked and brought into view (as the service's case page).
@@ -1595,7 +1724,7 @@
     // Tabs: one part of the case at a time (as the service's case page).
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
-    const tabs = [["summary", dot + (act ? "Action required" : check ? "Review recommended" : "No issues found"), act + check],
+    const tabs = [["summary", dot + (act ? "Worth a look" : check ? "For information" : "Nothing to note"), act + check],
                   ["budget", "Budget planner"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
                   ["bank", "Bank transactions", Object.keys(waiting).length],
                   ["sources", "Sources"], ["outputs", "Outputs and audit"]];
@@ -1615,6 +1744,7 @@
         <h1 class="title">${esc(caseTitle(c))}</h1></div></div>
       <p class="case-meta"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span> ${statusPill(c)}
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
+      ${freshnessHtml(c)}
       <div class="case-actions">
         <button class="btn-secondary" data-open-statement>Open Banking statement</button>
         <button class="btn-secondary" data-open-credit>Credit report</button>
@@ -1629,12 +1759,12 @@
 
       ${panel("income", bankReportHtml(c))}
 
-      ${panel("taken", (open.length ? `<div class="section" data-src="all"><h2 id="decide">To decide<span class="count">${plural(blocking(c), "difference")}</span></h2>
+      ${panel("taken", (open.length ? `<div class="section" data-src="all"><h2 id="decide">Figures that differ<span class="count">${plural(blocking(c), "difference")}</span></h2>
         <p class="section-note">There is no figure to take for these: use the source's, or keep what was entered with a reason.</p>
         ${open.map(findingHtml).join("")}</div>` : "") + takenHtml(c) + `
         <div class="inline-form" data-src="all">
-          <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Approve fact find</button>
-          <span class="small muted">${blocking(c) ? "Decide every difference first." : complete ? `Approved ${esc(shortTime(c.completed_at))}.` : ""}</span>
+          <button class="btn-primary" id="approve-btn" ${blocking(c) || complete ? "disabled" : ""}>Confirm fact find</button>
+          <span class="small muted">${blocking(c) ? "Choose a figure for each difference first." : complete ? `Confirmed ${esc(shortTime(c.completed_at))}.` : ""}</span>
         </div>`)}
 
 
@@ -1647,7 +1777,7 @@
         ${bankingHtml(c)}</div>` : ""}
       </section>
 
-      ${panel("sources", `<div class="section" data-src="all"><h2>Sources</h2>${sources}</div>`)}
+      ${panel("sources", `<div class="section" data-src="all"><h2 id="sources">Sources</h2>${sources}</div>`)}
 
       <section class="tab-panel" data-tab="outputs"${caseTab === "outputs" ? "" : " hidden"}>
       <div class="section" data-src="all"><h2>Outputs</h2>
@@ -1724,6 +1854,30 @@
       if (cat === "TRANSFER") { alert("Transfers are found by pairing both sides; choose what the money was for."); return; }
       E.recategorise(state.cases, c, id, cat, remember, WHO, D); save(); renderCase();
     }));
+    // Notes and known changes: kept with the case; no figure changes.
+    const addNote = (note) => {
+      c.notes = c.notes || [];
+      c.notes.push(Object.assign({ id: "n" + Date.now() + c.notes.length, by: WHO, at: new Date().toISOString(), withdrawn: false,
+                                   kind: "NOTE", about: "", monthly: null, starts: "" }, note));
+      save(); renderCase();
+    };
+    document.querySelectorAll("#case-view [data-note-add]").forEach((b) => b.addEventListener("click", () => {
+      const input = b.parentElement.querySelector("[data-note-text]"), text = input.value.trim();
+      if (!text) { input.focus(); input.placeholder = "Write the note first"; return; }
+      addNote({ about: b.dataset.noteAbout || "", text: text.slice(0, 2000) });
+    }));
+    document.querySelectorAll("#case-view [data-kc-add]").forEach((b) => b.addEventListener("click", () => {
+      const form = b.closest(".inline-form"), input = form.querySelector("[data-kc-text]"), text = input.value.trim();
+      const raw = form.querySelector("[data-kc-monthly]").value.replace(/[£,\s]/g, "");
+      if (!text) { input.focus(); input.placeholder = "What changes?"; return; }
+      if (raw && isNaN(Number(raw))) { alert("The amount a month should be a number, e.g. -350 or 120"); return; }
+      addNote({ kind: "CHANGE", text: text, monthly: raw ? Number(raw).toFixed(2) : null, starts: form.querySelector("[data-kc-starts]").value });
+    }));
+    document.querySelectorAll("#case-view [data-note-remove]").forEach((b) => b.addEventListener("click", () => {
+      const n = (c.notes || []).find((x) => x.id === b.dataset.noteRemove);
+      if (n) { n.withdrawn = true; save(); renderCase(); }
+    }));
+    document.querySelectorAll("#case-view [data-budget-xlsx]").forEach((b) => b.addEventListener("click", () => budgetXlsx(c, b.dataset.budgetXlsx)));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
     $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
     document.querySelectorAll("[data-output]").forEach((b) => b.addEventListener("click", () => {
@@ -1733,7 +1887,7 @@
     $("approve-btn").addEventListener("click", () => {
       c.status = "COMPLETE"; c.completed_at = new Date().toISOString();
       c.factfind.audit.push({ at: c.completed_at, by: WHO, path: "fact find", old: null,
-                              new: "approved", origin: "BROKER", status: "APPROVED", reason: "" });
+                              new: "confirmed", origin: "BROKER", status: "CONFIRMED", reason: "" });
       save(); renderCase();
     });
   }
@@ -1897,12 +2051,18 @@
       if (!only) {
       // What the adviser needs to know, first.
       section("Summary");
-      const issues = flagsFor(c).filter((f) => f.level !== "OK");
-      if (!issues.length) table(null, [[{ content: "No issues found.", styles: { fontStyle: "bold" } },
+      const issues = flagsFor(c).filter((f) => f.level !== "OK"), notes = liveNotes(c, "NOTE");
+      if (!issues.length) table(null, [[{ content: "Nothing to note.", styles: { fontStyle: "bold" } },
         "Checked: " + flagsFor(c).map((f) => f.title).join("; ") + "."]], { columns: { 0: { cellWidth: 100 } } });
       else table(["", "What to know"], issues.map((f) => [{ content: FLAG_WORD[f.level], styles: { fontStyle: "bold",
         textColor: f.level === "ACT" ? [163, 15, 63] : f.level === "CHECK" ? [138, 90, 6] : [31, 122, 99] } },
-        f.title + (f.detail ? "\n" + f.detail : "")]), { columns: { 0: { cellWidth: 50 } } });
+        f.title + (f.detail ? "\n" + f.detail : "") + notes.filter((n) => n.about === f.title).map((n) => `\nAdviser: "${n.text}" (${n.by})`).join("")]),
+        { columns: { 0: { cellWidth: 72 } } });
+      const general = notes.filter((n) => !n.about);
+      if (general.length) {
+        section("Adviser Notes");
+        table(["Note", "By"], general.map((n) => [n.text, `${n.by}, ${shortTime(n.at)}`]), { columns: { 1: { cellWidth: width * 0.3 } } });
+      }
 
       }
       // The bank accounts, with sort code, number and balance.
@@ -1978,6 +2138,26 @@
                 items.length ? items.map((x) => [x.primary, x.sub, String(x.n30), gbp(x.v30), String(x.n90), gbp(x.v90)])
                              : [["None in the last 90 days.", "", "", "", "", ""]], { nums: [2, 3, 4, 5] });
         });
+      });
+      // What happened, what's changing and how pay moves.
+      const ins = c.insights || {};
+      if ((ins.events || []).length) {
+        section("Events in the Bank Data");
+        table(["Events in the bank data", "Detail", "Whose"], ins.events.map((e) => [{ content: e.title, styles: { fontStyle: "bold" } }, e.detail, e.who]),
+              { columns: { 0: { cellWidth: width * 0.36 }, 2: { cellWidth: width * 0.18 } } });
+      }
+      const changes = liveNotes(c, "CHANGE");
+      if ((ins.ending || []).length || changes.length) {
+        section("What's Changing");
+        table(["What's changing", "Whose", "£ a month", "From"],
+              (ins.ending || []).map((x) => [`${x.lender} ${x.type.toLowerCase()} ends`, x.who, `${gbp(x.monthly)} less`, `${x.ends} (${x.months_left} months)`])
+                .concat(changes.map((n) => [n.text, `noted by ${n.by}`, monthlyText(n), startsText(n.starts)])), { nums: [2] });
+      }
+      (ins.pattern || []).forEach((p) => {
+        section(`Income Pattern · ${p.who}`);
+        table([p.who].concat(p.labels, ["Lowest to highest", "Notes"]),
+              p.sources.map((s2) => [{ content: s2.payer, styles: { fontStyle: "bold" } }].concat(s2.months.map(gbp), [`${gbp(s2.low)} - ${gbp(s2.high)}`, patternNote(s2)])),
+              { nums: [...Array(p.labels.length + 1).keys()].map((i) => i + 1) });
       });
 
       // Each credit report on its own.

@@ -358,6 +358,7 @@
       variant: variantKey || def.default_variant,
       parties: v.parties, factfind: v.factfind, findings: v.findings, pack: v.pack,
       transactions: def.transactions, months: def.months, accounts: def.accounts,
+      insights: def.insights || { events: [], ending: [], pattern: [], freshness: [] }, notes: [],
     }));
     c.status = "REVIEW";
     Object.assign(c, extra || {});
