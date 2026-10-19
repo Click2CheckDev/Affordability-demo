@@ -473,6 +473,7 @@
   tr.flash { animation: none; } tr.flash > td { animation: flashrow 2.8s ease-out; }
   /* The budget planner (cases/base.html) */
   .budget-switch { display: flex; gap: 2px; border-bottom: 1px solid #ececef; margin-bottom: 12px; }
+  .budget-switch[hidden] { display: none; }
   .budget-switch button { width: auto; height: 34px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
                           padding: 0 14px; font: inherit; font-size: 13.5px; color: var(--muted); }
   .budget-switch button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
@@ -1585,13 +1586,13 @@
 
   // Each credit report on its own, as it arrived.
   // The budget planner: the form or the CRM's categories (cases/_budget_planner.html).
-  let budgetLayout = "form";
+  let budgetLayout = Object.keys(D.budget_layouts)[0];
   function budgetHtml(c) {
     const fromPill = (f) => pill(f === "Credit report" ? "difference" : f === "Open Banking" ? "verified" : "derived", f);
     const layouts = Object.keys(D.budget_layouts).map((k) => E.budgetPlanner(c, k, D.budget_layouts, D.lines));
     return `<div class="section" data-src="all"><h2 id="budget">Budget planner</h2>
-      <p class="section-note">The fact find as a budget planner: every figure from the bank statements and credit report, line by line, and what each is made of. Switch between the form and the CRM's categories.</p>
-      <div class="budget-switch">${layouts.map((b) => `<button data-budget="${b.key}" class="${b.key === budgetLayout ? "active" : ""}">${esc(b.name)}</button>`).join("")}</div>
+      <p class="section-note">The fact find as a budget planner: every figure from the bank statements and credit report, line by line, and what each is made of, laid out in the CRM's categories.</p>
+      <div class="budget-switch"${layouts.length > 1 ? "" : " hidden"}>${layouts.map((b) => `<button data-budget="${b.key}" class="${b.key === budgetLayout ? "active" : ""}">${esc(b.name)}</button>`).join("")}</div>
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
         <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
           <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
