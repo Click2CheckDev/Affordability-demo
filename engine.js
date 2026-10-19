@@ -359,6 +359,7 @@
       parties: v.parties, factfind: v.factfind, findings: v.findings, pack: v.pack,
       transactions: def.transactions, months: def.months, accounts: def.accounts,
       insights: def.insights || { events: [], ending: [], pattern: [], freshness: [] }, notes: [],
+      income_detail: def.income_detail || [],
     }));
     c.status = "REVIEW";
     Object.assign(c, extra || {});

@@ -1595,6 +1595,10 @@
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
         <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
           <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
+        ${(c.income_detail || []).length ? `<div class="table-wrap" style="margin-bottom:12px"><table class="budget-table"><thead><tr><th>Income, each applicant</th><th class="num">Figure</th><th>From</th></tr></thead><tbody>
+          ${c.income_detail.map((a) => `<tr class="budget-head"><td colspan="3">Applicant ${a.n}: ${esc(a.who)}</td></tr>
+            ${a.rows.map((r) => `<tr><td>${esc(r.label)}${r.note ? `<br><span class="small muted">${esc(r.note)}</span>` : ""}</td><td class="num">${esc(r.value)}</td><td>${r.from.map(fromPill).join(" ")}</td></tr>`).join("")}`).join("")}
+        </tbody></table></div>` : ""}
         <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
           <tr class="budget-head"><td colspan="3">${b.key === "categories" ? "Household income" : "Income"}</td></tr>
           ${b.income.map((r) => `<tr${r.value === "0.00" ? ' class="budget-zero"' : ""}><td>${esc(r.label)}${r.before_tax ? `<br><span class="small muted">After tax; before tax ${gbp(r.before_tax)}</span>` : ""}</td>
@@ -1647,6 +1651,18 @@
       row += 1; return row - 1;
     };
     const money = (v) => E.num(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // Each applicant's income first, with where each figure came from.
+    (c.income_detail || []).forEach((a) => {
+      band(`Income: applicant ${a.n}, ${a.who}`);
+      a.rows.forEach((r) => {
+        ws.getCell("A" + row).value = r.label + (r.note ? ` (${r.note})` : "");
+        ws.getCell("B" + row).value = r.value; ws.getCell("B" + row).alignment = { horizontal: "right" };
+        ws.getCell("C" + row).value = r.from.join(", ");
+        ["A", "B", "C"].forEach((col) => { ws.getCell(col + row).border = { bottom: { style: "thin", color: { argb: "FFD8D8D8" } } }; });
+        row += 1;
+      });
+      row += 1;
+    });
     band(b.key === "categories" ? "Household income" : "Income");
     const first = row;
     b.income.forEach((r) => line(r.label + (r.before_tax ? ` (before tax ${money(r.before_tax)})` : ""), r.value, r.from.join(", ")));
