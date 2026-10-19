@@ -751,7 +751,14 @@
         const provider = (hits.find((t) => t.provider) || {}).provider;
         const [primary, sub] = categoryPath(key.toUpperCase(), "", paths);
         out[key] = { value: value, source: origin, category: provider || `${primary} > ${sub}`,
-                     note: `${who}. ${monthsText}.` + ((prov[`expenditure.${key}`] || {}).status === "VERIFIED" ? " The customer's figure agrees with the bank." : "") };
+                     note: `${who}. ${monthsText}.` };
+        // The months added up, so the figure can be followed back to them.
+        const total = Object.values(month).reduce((s, v) => s + v, 0), average = Math.round(total / n * 100) / 100;
+        const verified = (prov[`expenditure.${key}`] || {}).status === "VERIFIED";
+        out[key].note += ` Total ${pounds(total)} over ${n} months = ${pounds(average)} a month on average.`;
+        if (Math.abs(average - value) >= 0.01) out[key].note += verified ? ` The form uses ${pounds(value)}: the customer's figure, which the bank confirms.`
+          : ` The form uses ${pounds(value)}, the figure kept for this line: check with the client.`;
+        else if (verified) out[key].note += " The customer's figure agrees with the bank.";
       } else if (value) out[key] = { value: value, source: origin, category: "", note: `As the customer gave it; nothing seen in ${n} months of statements. Ask the client.` };
       else out[key] = { value: value, source: "Open Banking", category: "", note: `None seen in ${n} months of statements.` };
     });
