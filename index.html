@@ -474,6 +474,8 @@
   /* The budget planner (cases/base.html) */
   .budget-switch { display: flex; gap: 2px; border-bottom: 1px solid #ececef; margin-bottom: 12px; }
   .budget-switch[hidden] { display: none; }
+  .budget-table.prepop td.detail { font-size: 12px; color: var(--muted); min-width: 280px; max-width: 520px; }
+  .budget-table.prepop td.detail strong { color: var(--ink); font-weight: 500; }
   .budget-switch button { width: auto; height: 34px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
                           padding: 0 14px; font: inherit; font-size: 13.5px; color: var(--muted); }
   .budget-switch button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
@@ -1590,16 +1592,15 @@
   function budgetHtml(c) {
     const fromPill = (f) => pill(f === "Credit report" ? "difference" : f === "Open Banking" ? "verified" : "derived", f);
     const layouts = Object.keys(D.budget_layouts).map((k) => E.budgetPlanner(c, k, D.budget_layouts, D.lines));
+    const tabs = layouts.map((b) => [b.key, b.name]).concat(Object.entries(FORMS));
     return `<div class="section" data-src="all"><h2 id="budget">Budget planner</h2>
-      <p class="section-note">The fact find as a budget planner: every figure from the bank statements and credit report, line by line, and what each is made of, laid out in the CRM's categories.</p>
-      <div class="budget-switch"${layouts.length > 1 ? "" : " hidden"}>${layouts.map((b) => `<button data-budget="${b.key}" class="${b.key === budgetLayout ? "active" : ""}">${esc(b.name)}</button>`).join("")}</div>
+      <p class="section-note">The fact find as a budget planner: every figure from the bank statements and credit report, line by line, with where it came from. The CRM's categories, or the C2C forms prepopulated: each line's source, the bank category or credit report account behind it, and who was paid, month by month.</p>
+      <div class="budget-switch">${tabs.map(([key, name]) => `<button data-budget="${key}" class="${key === budgetLayout ? "active" : ""}">${esc(name)}</button>`).join("")}</div>
+      ${Object.keys(FORMS).map((key) => formHtml(c, key, fromPill)).join("")}
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
         <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
           <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
-        ${(c.income_detail || []).length ? `<div class="table-wrap" style="margin-bottom:12px"><table class="budget-table"><thead><tr><th>Income, each applicant</th><th class="num">Figure</th><th>From</th></tr></thead><tbody>
-          ${c.income_detail.map((a) => `<tr class="budget-head"><td colspan="3">Applicant ${a.n}: ${esc(a.who)}</td></tr>
-            ${a.rows.map((r) => `<tr><td>${esc(r.label)}${r.note ? `<br><span class="small muted">${esc(r.note)}</span>` : ""}</td><td class="num">${esc(r.value)}</td><td>${r.from.map(fromPill).join(" ")}</td></tr>`).join("")}`).join("")}
-        </tbody></table></div>` : ""}
+        ${incomeTableHtml(c, fromPill)}
         <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
           <tr class="budget-head"><td colspan="3">${b.key === "categories" ? "Household income" : "Income"}</td></tr>
           ${b.income.map((r) => `<tr${r.value === "0.00" ? ' class="budget-zero"' : ""}><td>${esc(r.label)}${r.before_tax ? `<br><span class="small muted">After tax; before tax ${gbp(r.before_tax)}</span>` : ""}</td>
@@ -1611,6 +1612,170 @@
             ${s.total ? `<tr class="budget-total"><td>${esc(s.total.label)}</td><td class="num">${gbp(s.total.value)}</td><td></td></tr>` : ""}`).join("")}
           <tr class="budget-result"><td>${esc(b.result.label)}</td><td class="num">${gbp(b.result.value)}</td><td></td></tr>
         </tbody></table></div></div>`).join("")}</div>`;
+  }
+
+  // Each applicant's income, with where each figure came from.
+  function incomeTableHtml(c, fromPill) {
+    return (c.income_detail || []).length ? `<div class="table-wrap" style="margin-bottom:12px"><table class="budget-table"><thead><tr><th>Income, each applicant</th><th class="num">Figure</th><th>From</th></tr></thead><tbody>
+      ${c.income_detail.map((a) => `<tr class="budget-head"><td colspan="3">Applicant ${a.n}: ${esc(a.who)}</td></tr>
+        ${a.rows.map((r) => `<tr><td>${esc(r.label)}${r.note ? `<br><span class="small muted">${esc(r.note)}</span>` : ""}</td><td class="num">${esc(r.value)}</td><td>${r.from.map(fromPill).join(" ")}</td></tr>`).join("")}`).join("")}
+    </tbody></table></div>` : "";
+  }
+
+  // The C2C forms prepopulated (cases/prepopulated.py): every line with its
+  // source, the bank category or credit report account, and what it is made of.
+  const FORMS = { c2c: "C2C budget planner", mef: "Mortgage Expenditure Form" };
+  const FORM_GROUPS = ["Committed", "Basic Essential", "Basic Quality of Living"];
+  function formSections(c, key) {
+    const notes = E.lineNotes(c, D.lines, D.category_paths), label = Object.fromEntries(D.lines.map((l) => [l.key, l.label]));
+    const row = (text, keys, definition) => {
+      if (!keys.length) return { label: text, definition: definition || "", keys: keys, value: 0, source: "–", category: "", note: "Nothing in the reports maps to this line." };
+      const parts = keys.map((k) => notes[k]).filter(Boolean), shown = parts.filter((p) => p.value).length ? parts.filter((p) => p.value) : parts;
+      return { label: text, definition: definition || "", keys: keys, value: parts.reduce((s, p) => s + p.value, 0),
+               source: [...new Set(shown.flatMap((p) => p.source.split(", ")))].sort().join(", "),
+               category: shown.map((p) => p.category).filter(Boolean).join("; "),
+               note: keys.filter((k) => notes[k] && (notes[k].value || shown.length === parts.length)).map((k) => (keys.length > 1 ? `${label[k]}: ` : "") + notes[k].note).join(" ") };
+    };
+    if (key === "c2c") return D.c2c_planner.map(([title, rows]) => {
+      const done = [];
+      rows.forEach(([text, keys]) => {
+        if (keys === null) {     // the credit total: the rows since the section began that are credit lines
+          const credit = done.filter((r) => r.keys.length && r.keys.every((k) => (D.lines.find((l) => l.key === k) || {}).commitment_types.length));
+          done.push({ label: text, total: true, value: credit.reduce((s, r) => s + r.value, 0), source: "Credit report", rows: credit });
+        } else done.push(row(text, keys));
+      });
+      return { title: title, rows: done };
+    });
+    return FORM_GROUPS.map((g) => ({ title: g, rows: D.lines.filter((l) => l.group === g).map((l) => row(l.label, [l.key], l.definition)) }));
+  }
+  function formHtml(c, key, fromPill) {
+    const sections = formSections(c, key), add = (rows) => rows.filter((r) => !r.total).reduce((s, r) => s + r.value, 0);
+    const outgoings = sections.reduce((s, x) => s + add(x.rows), 0), net = E.num((c.factfind.data.summary || {}).net_monthly_income);
+    const sourcePills = (s) => s === "–" ? '<span class="muted">–</span>' : s.split(", ").map(fromPill).join(" ");
+    return `<div class="panel budget" data-budget-layout="${key}"${key === budgetLayout ? "" : " hidden"}>
+      <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${key === "c2c" ? "C2C's budget planner (Expenditure Categories)" : "C2C's Mortgage Expenditure Form, with its credit card and loan sheets filled from the credit report"}, prepopulated: the Excel adds an Adviser flags sheet.</span>
+        <button class="btn-secondary" data-budget-xlsx="${key}">Download (Excel)</button></p>
+      ${incomeTableHtml(c, fromPill)}
+      <div class="table-wrap"><table class="budget-table prepop"><thead><tr><th>${key === "c2c" ? "Budget planner" : "Mortgage Expenditure Form"}: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>Source</th><th>Bank report category · detail</th></tr></thead><tbody>
+        ${sections.map((s) => `<tr class="budget-head"><td colspan="4">${esc(s.title)}</td></tr>
+          ${s.rows.map((r) => r.total ? `<tr class="budget-total"><td>${esc(r.label)}</td><td class="num">${gbp(r.value)}</td><td>${sourcePills(r.source)}</td><td></td></tr>`
+            : `<tr${r.value ? "" : ' class="budget-zero"'}><td>${esc(r.label)}${r.definition ? `<br><span class="small muted">${esc(r.definition)}</span>` : ""}</td><td class="num">${gbp(r.value)}</td>
+              <td>${sourcePills(r.source)}</td><td class="detail">${r.category ? `<strong>${esc(r.category)}</strong><br>` : ""}${esc(r.note)}</td></tr>`).join("")}
+          <tr class="budget-total"><td>Total ${esc(s.title)}</td><td class="num">${gbp(add(s.rows))}</td><td></td><td></td></tr>`).join("")}
+        <tr class="budget-total"><td>Total outgoings</td><td class="num">${gbp(outgoings)}</td><td></td><td></td></tr>
+        <tr><td>Total net monthly income</td><td class="num">${gbp(net)}</td><td>${fromPill("Open Banking")}</td><td class="detail">Each applicant's pay into the bank, a month.</td></tr>
+        <tr class="budget-result"><td>Left over</td><td class="num">${gbp(net - outgoings)}</td><td></td><td></td></tr>
+      </tbody></table></div></div>`;
+  }
+
+  // The Adviser flags sheet: income, the reconciliation, the flags (as cases/prepopulated.flags_sheet).
+  function adviserFlagsSheet(wb, c) {
+    const ws = wb.addWorksheet("Adviser flags");
+    ws.getColumn(1).width = 48; ws.getColumn(2).width = 18; ws.getColumn(3).width = 100;
+    const money = "£#,##0.00;-£#,##0.00", wrap = { wrapText: true, vertical: "top" };
+    const head = (text) => { ws.addRow([]); ws.addRow([text]).getCell(1).font = { bold: true }; };
+    const row = (a, b, note, isMoney) => {
+      const r = ws.addRow([a, isMoney ? Math.round(E.num(b) * 100) / 100 : (b || ""), note || ""]);
+      if (isMoney) r.getCell(2).numFmt = money;
+      r.getCell(1).alignment = wrap; r.getCell(3).alignment = wrap;
+    };
+    ws.addRow(["Adviser flags: what the reports show"]).getCell(1).font = { bold: true, size: 13 };
+    row("Client", c.factfind.data.applicants.map((a) => a.full_name).join(", "), `Case ${c.reference}`);
+    const block = bankBlocks(c).find((b) => b.src.split(" ")[0] === "all" && !b.business);
+    if (block) row("Basis", `${block.report.labels[0]} to ${block.report.labels[block.report.labels.length - 1]}`,
+                   `Average of ${block.report.labels.length} complete calendar months of Open Banking, and the credit report.`);
+    head("INCOME");
+    (c.income_detail || []).forEach((a) => {
+      ws.addRow([`Applicant ${a.n}: ${a.who}`]).getCell(1).font = { bold: true };
+      a.rows.forEach((r) => row(r.label, r.value, r.from.join(", ") + (r.note ? `: ${r.note}` : "")));
+    });
+    head("RECONCILIATION");
+    const mapped = Object.values(c.factfind.data.expenditure || {}).reduce((s, v) => s + E.num(v), 0);
+    row("Total on the form", mapped, "Every expenditure line added together (credit from the credit report).", true);
+    const spent = block && block.report.overview.find((x) => /xpenditure/.test(x.label));
+    if (spent) {
+      row("Average monthly spending in the bank", spent.average, "Full expenditure breakdown, every connected account, as the bank report.", true);
+      row("Difference", E.num(spent.average) - mapped, "Spending in the bank the form's lines don't carry (cash, transfers to people, spending with no line), less anything on the form not paid from a connected account.", true);
+    }
+    const found = flagsFor(c);
+    [["WORTH A LOOK", "ACT"], ["FOR INFORMATION", "CHECK"]].forEach(([title, level]) => {
+      const mine = found.filter((f) => f.level === level);
+      if (mine.length) { head(title); mine.forEach((f) => row(f.title, "", f.detail)); }
+    });
+    const ending = (c.insights || {}).ending || [];
+    if (ending.length) { head("WHAT'S CHANGING"); ending.forEach((x) => row(`${x.lender} ${x.type.toLowerCase()} ends`, x.ends, `${x.who}: ${gbp(x.monthly)} a month less, ${x.months_left} months from the credit report date.`)); }
+    const fine = found.filter((f) => f.level === "OK");
+    if (fine.length) { head("CHECKED, NOTHING FOUND"); fine.forEach((f) => row(f.title, "", f.detail)); }
+    head("NOTE");
+    row("", "", "This sheet sets out what the credit report and Open Banking show, and what is missing. It does not say whether the case stacks up: the affordability assessment and the suitability decision remain the adviser's.");
+  }
+  const SOURCE_FILL = { "Open Banking": "FFDFF3EE", "Credit report": "FFFDE3EB", Customer: "FFFDF0DC" };
+  const sourceFill = (cell) => { const f = SOURCE_FILL[String(cell.value || "").split(",")[0]]; if (f) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: f } }; };
+
+  // The C2C budget planner, prepopulated, as Excel.
+  async function c2cXlsx(c) {
+    const wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet("Sheet1"), money = "£#,##0.00;-£#,##0.00";
+    [40, 14, 18, 46, 90].forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+    ws.addRow(["Committed", "Monthly (£)", "Source", "Bank report category / credit report", "Detail"]).font = { bold: true };
+    const totals = [];
+    formSections(c, "c2c").forEach((s, i) => {
+      if (i) { ws.addRow([]); ws.addRow([s.title]).font = { bold: true }; }
+      ws.addRow([]);
+      const first = ws.rowCount + 1, rows = [];
+      s.rows.forEach((r) => {
+        if (r.total) {
+          const credit = rows.filter((x) => r.rows.includes(x.r)).map((x) => `B${x.n}`);
+          const t = ws.addRow([r.label, { formula: credit.join("+") || "0" }, "Credit report"]);
+          t.getCell(2).numFmt = money; sourceFill(t.getCell(3));
+          return;
+        }
+        const x = ws.addRow([r.label, Math.round(r.value * 100) / 100, r.source, r.category, r.note]);
+        x.getCell(2).numFmt = money; sourceFill(x.getCell(3)); x.getCell(5).alignment = { wrapText: true, vertical: "top" };
+        [1, 2, 3, 4].forEach((k) => { x.getCell(k).alignment = { vertical: "top" }; });
+        rows.push({ r: r, n: x.number });
+      });
+      const t = ws.addRow([`Total ${s.title}`, { formula: rows.map((x) => `B${x.n}`).join("+") }]);
+      t.font = { bold: true }; t.getCell(2).numFmt = money; totals.push(t.number);
+      void first;
+    });
+    ws.addRow([]);
+    const all = ws.addRow(["TOTAL OUTGOINGS", { formula: totals.map((n) => `B${n}`).join("+") }]);
+    all.font = { bold: true }; all.getCell(2).numFmt = money;
+    ws.addRow([]);
+    ws.addRow(["Income"]).font = { bold: true };
+    (c.income_detail || []).forEach((a) => {
+      ws.addRow([`Applicant ${a.n}: ${a.who}`]).font = { bold: true };
+      a.rows.forEach((r) => { const x = ws.addRow([r.label, r.value, r.from.join(", "), "", r.note]); x.getCell(2).alignment = { horizontal: "right" }; sourceFill(x.getCell(3)); });
+    });
+    ws.addRow([]);
+    const net = ws.addRow(["Total net monthly income", E.num((c.factfind.data.summary || {}).net_monthly_income), "Open Banking", "", "Each applicant's pay into the bank, a month (average of the complete months)."]);
+    net.getCell(2).numFmt = money; sourceFill(net.getCell(3));
+    const left = ws.addRow(["Left over (net income less total outgoings)", { formula: `B${net.number}-B${all.number}` }]);
+    left.font = { bold: true }; left.getCell(2).numFmt = money;
+    adviserFlagsSheet(wb, c);
+    download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} C2C budget planner (prepopulated).xlsx`);
+  }
+
+  // The Mortgage Expenditure Form, filled as the standard output, each line
+  // annotated beside it, and the Adviser flags sheet.
+  async function mefXlsx(c) {
+    const wb = await standardWorkbook(c), ws = wb.getWorksheet("Expenditure");
+    const notes = E.lineNotes(c, D.lines, D.category_paths);
+    [["A", 35.5], ["C", 40], ["E", 16], ["F", 46], ["G", 90]].forEach(([col, w]) => { ws.getColumn(col).width = w; });
+    [5, 24, 40].forEach((r) => [["E", "Source"], ["F", "Bank report category / credit report"], ["G", "Detail"]].forEach(([col, text]) => {
+      ws.getCell(`${col}${r}`).value = text; ws.getCell(`${col}${r}`).font = { bold: true };
+    }));
+    D.standard_mapping.fields.forEach((f) => {
+      const m = /^Expenditure!B(\d+)$/.exec(f.target);
+      if (!m || !f.path.startsWith("expenditure.")) return;
+      const n = notes[f.path.slice(12)];
+      if (!n) return;
+      const r = +m[1];
+      ws.getCell(`E${r}`).value = n.source; ws.getCell(`F${r}`).value = n.category; ws.getCell(`G${r}`).value = n.note;
+      sourceFill(ws.getCell(`E${r}`)); ws.getCell(`G${r}`).alignment = { wrapText: true, vertical: "top" };
+    });
+    adviserFlagsSheet(wb, c);
+    download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} Mortgage Expenditure Form (prepopulated).xlsx`);
   }
 
   // How old each source is, under the case's details.
@@ -1625,6 +1790,8 @@
   // The budget planner as an Excel file (cases/budget_excel.py): the layout's
   // bands and lines, totals as formulas so it still adds up after an edit.
   async function budgetXlsx(c, key) {
+    if (key === "c2c") return c2cXlsx(c);
+    if (key === "mef") return mefXlsx(c);
     const b = E.budgetPlanner(c, key, D.budget_layouts, D.lines);
     const wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet("Budget planner");
     ws.getColumn(1).width = 70; ws.getColumn(2).width = 16; ws.getColumn(3).width = 26;
@@ -1928,15 +2095,19 @@
   function made(c, kind, filename, button) {
     if (button && button !== "fill-template") { recordOutput(c, kind, filename); renderCase(); }
   }
+  async function standardWorkbook(c) {
+    const rendered = E.render(D.standard_mapping, c.factfind.data, D.lines);
+    const wb = await E.fillWorkbook(window.ExcelJS, await fetchBuffer("expenditure_form.xlsx"), rendered);
+    Object.entries(FORM_LINKS).forEach(([at, to]) => {
+      const i = at.lastIndexOf("!"); const cell = wb.getWorksheet(at.slice(0, i)).getCell(at.slice(i + 1));
+      cell.value = { text: String(cell.value && cell.value.text || cell.value || ""), hyperlink: "#" + to };
+    });
+    E.addC2CSheets(wb, c);
+    return wb;
+  }
   function downloadStandard(c, button) {
     return withButton(button, "Filling the form…", async () => {
-      const rendered = E.render(D.standard_mapping, c.factfind.data, D.lines);
-      const wb = await E.fillWorkbook(window.ExcelJS, await fetchBuffer("expenditure_form.xlsx"), rendered);
-      Object.entries(FORM_LINKS).forEach(([at, to]) => {
-        const i = at.lastIndexOf("!"); const cell = wb.getWorksheet(at.slice(0, i)).getCell(at.slice(i + 1));
-        cell.value = { text: String(cell.value && cell.value.text || cell.value || ""), hyperlink: "#" + to };
-      });
-      E.addC2CSheets(wb, c);
+      const wb = await standardWorkbook(c);
       download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} C2C expenditure form.xlsx`);
       made(c, "standard", `${c.reference} C2C expenditure form.xlsx`, button);
     });

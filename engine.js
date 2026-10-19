@@ -697,6 +697,67 @@
     return out;
   }
 
+  // --- where each planner line came from (cases/prepopulated.line_notes) -----------------
+  // For every planner line: its value, its source, the bank category or
+  // credit report account behind it, and who was paid month by month.
+  function lineNotes(kase, lines, paths) {
+    const data = kase.factfind.data, prov = kase.factfind.provenance, spend = data.expenditure || {};
+    const people = kase.parties.filter((p) => p.role !== "COMPANY").map((p) => p.key);
+    const txs = kase.transactions.filter((t) => people.includes(t.party));
+    const months = [...new Set(people.flatMap((k) => kase.months[k] || []))].sort(), n = months.length;
+    const inMonths = new Set(months);
+    const pounds = (v) => (v < 0 ? "-£" : "£") + Math.abs(Math.round(v * 100) / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const cap = (s) => String(s || "").replace(/_/g, " ").toLowerCase().replace(/^./, (x) => x.toUpperCase());
+    const payee = (t) => { const m = String(t.merchant || ""), name = m.includes(":") ? m.slice(m.indexOf(":") + 1) : t.description;
+      return name.split(/\s+/).filter(Boolean).map((w) => w === w.toUpperCase() ? w.charAt(0) + w.slice(1).toLowerCase() : w).join(" "); };
+    const commitments = (data.commitments || []).filter(Boolean);
+    const seen = creditCommitments(commitments, txs, months, creditLimits(kase.pack));
+    const bankPaid = {}; seen.rows.forEach((r) => { bankPaid[`${r.owner}|${r.lender}`] = r; });
+    const listed = commitments.map((c) => String(c.lender || "").toUpperCase());
+    const out = {};
+    lines.forEach((line) => {
+      const key = line.key, value = num(spend[key]);
+      const hits = txs.filter((t) => t.category === key.toUpperCase() && num(t.amount) < 0 && inMonths.has(t.date.slice(0, 7)));
+      if (line.commitment_types.length) {
+        const mine = (data.commitments || []).map((c, j) => [j, c]).filter(([, c]) => c && creditLineFor(c.type, lines) === key);
+        if (mine.length) {
+          const parts = mine.map(([, c]) => {
+            const r = bankPaid[`${c.owner || ""}|${c.lender || ""}`] || {};
+            return `${c.lender} (${c.owner_name || "joint"}): ${pounds(num(c.monthly_payment))} a month, balance ${pounds(num(c.balance))}`
+              + (r.limit ? `, limit ${pounds(num(r.limit))}` : "")
+              + (r.bank ? `; the bank shows ${pounds(num(r.bank))} a month paid` : "; not seen paid from a connected account");
+          });
+          out[key] = { value: value, source: [...new Set(mine.map(([j]) => budgetOrigin(prov[`commitments[${j}].monthly_payment`], "Credit report")))].sort().join(", "),
+                       category: "Credit report: " + [...new Set(mine.map(([, c]) => cap(c.type)))].sort().join(", "),
+                       note: parts.join("; ") + ". Details on the credit sheets." };
+        } else out[key] = { value: value, source: "Credit report", category: "Credit report", note: "None on the credit report." };
+        // Repayments the bank shows that the credit report doesn't (payday lending, say).
+        const unlisted = {};
+        hits.forEach((t) => { if (!listed.some((l) => lenderWords(l).some((w) => t.description.toUpperCase().includes(w)))) (unlisted[payee(t)] = unlisted[payee(t)] || []).push(t); });
+        if (Object.keys(unlisted).length) {
+          out[key].source = [...new Set([out[key].source, "Open Banking"])].sort().join(", ");
+          out[key].note += " The bank also shows " + Object.entries(unlisted).map(([name, ts]) =>
+            `${name}: ${ts.length} payments, ${pounds(ts.reduce((s, t) => s - num(t.amount), 0) / n)} a month on average`).join("; ") + ", not on the credit report. Ask the client.";
+        }
+        return;
+      }
+      const origin = budgetOrigin(prov[`expenditure.${key}`], "Open Banking");
+      if (hits.length) {
+        const by = {}; hits.forEach((t) => { (by[payee(t)] = by[payee(t)] || []).push(t); });
+        const who = Object.entries(by).sort((a, b) => b[1].reduce((s, t) => s - num(t.amount), 0) - a[1].reduce((s, t) => s - num(t.amount), 0))
+          .map(([name, ts]) => `${name}: ${ts.length} payment${ts.length > 1 ? "s" : ""} in ${new Set(ts.map((t) => t.date.slice(0, 7))).size} of ${n} months`).join("; ");
+        const month = {}; hits.forEach((t) => { const m = t.date.slice(0, 7); month[m] = (month[m] || 0) - num(t.amount); });
+        const monthsText = months.map((m) => `${MONTHS[+m.slice(5, 7) - 1]} ${pounds(month[m] || 0)}`).join(", ");
+        const provider = (hits.find((t) => t.provider) || {}).provider;
+        const [primary, sub] = categoryPath(key.toUpperCase(), "", paths);
+        out[key] = { value: value, source: origin, category: provider || `${primary} > ${sub}`,
+                     note: `${who}. ${monthsText}.` + ((prov[`expenditure.${key}`] || {}).status === "VERIFIED" ? " The customer's figure agrees with the bank." : "") };
+      } else if (value) out[key] = { value: value, source: origin, category: "", note: `As the customer gave it; nothing seen in ${n} months of statements. Ask the client.` };
+      else out[key] = { value: value, source: "Open Banking", category: "", note: `None seen in ${n} months of statements.` };
+    });
+    return out;
+  }
+
   // --- the C2C Data Pack, as it stands now ------------------------------------------------
   function dataPack(c, lines) {
     const pack = JSON.parse(JSON.stringify(c.pack));
@@ -720,7 +781,7 @@
   }
 
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
-                bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num,
+                bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num, lineNotes,
                 makeCase, rename, glance, changes, dataPack, bankReport, statement, chart, chartSvg, payer,
                 categoryPath, MONTHS, budgetPlanner, creditCommitments, creditLimits, lenderWords };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
