@@ -1601,6 +1601,7 @@
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
         <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
           ${b.key === "me" ? `<button class="btn-primary" id="me-pdf">Mortgage Experience fact find (PDF)</button>` : ""}
+          <button class="btn-secondary" data-budget-pdf="${b.key}">Download (PDF)</button>
           <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
         ${incomeTableHtml(c, fromPill)}
         <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
@@ -1656,6 +1657,7 @@
     const sourcePills = (s) => s === "–" ? '<span class="muted">–</span>' : s.split(", ").map(fromPill).join(" ");
     return `<div class="panel budget" data-budget-layout="${key}"${key === budgetLayout ? "" : " hidden"}>
       <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${key === "c2c" ? "C2C's budget planner (Expenditure Categories)" : "C2C's Mortgage Expenditure Form, with its credit card and loan sheets filled from the credit report"}, prepopulated: the Excel adds an Adviser flags sheet.</span>
+        <button class="btn-secondary" data-budget-pdf="${key}">Download (PDF)</button>
         <button class="btn-secondary" data-budget-xlsx="${key}">Download (Excel)</button></p>
       ${incomeTableHtml(c, fromPill)}
       <div class="table-wrap"><table class="budget-table prepop"><thead><tr><th>${key === "c2c" ? "Budget planner" : "Mortgage Expenditure Form"}: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>Source</th><th>Bank report category · detail</th></tr></thead><tbody>
@@ -2064,6 +2066,7 @@
       if (n) { n.withdrawn = true; save(); renderCase(); }
     }));
     document.querySelectorAll("#case-view [data-budget-xlsx]").forEach((b) => b.addEventListener("click", () => budgetXlsx(c, b.dataset.budgetXlsx)));
+    document.querySelectorAll("#case-view [data-budget-pdf]").forEach((b) => b.addEventListener("click", () => budgetPdf(c, b.dataset.budgetPdf)));
     if ($("me-pdf")) $("me-pdf").addEventListener("click", () => makeOutput(c, "me", "me-pdf"));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
     $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
@@ -2114,6 +2117,112 @@
       download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} C2C expenditure form.xlsx`);
       made(c, "standard", `${c.reference} C2C expenditure form.xlsx`, button);
     });
+  }
+
+  // A budget planner view as a PDF: the layout's lines, each with its figure
+  // and where it came from (and, for the C2C forms, the bank category and who
+  // was paid), after each applicant's income.
+  async function budgetPdf(c, key) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 36, width = W - 2 * M;
+    const ink = [28, 27, 31], muted = [123, 123, 123], pink = [230, 23, 88], grey = [206, 204, 204], light = [243, 243, 245];
+    const TAG = { "Credit report": [[253, 227, 235], [163, 15, 63]], "Open Banking": [[223, 243, 238], [31, 122, 99]],
+                  Customer: [[253, 240, 220], [138, 90, 6]], "Fact find": [[253, 240, 220], [138, 90, 6]] };
+    const form = FORMS[key], b = form ? null : E.budgetPlanner(c, key, D.budget_layouts, D.lines);
+    const name = form || b.name;
+    let y = 42;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...ink);
+    doc.text(form ? name : `Budget planner: ${name}`, M, y + 10);
+    try {
+      const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = "logo.png"; });
+      const canvas = document.createElement("canvas"); canvas.width = 384; canvas.height = Math.round(384 * img.height / img.width);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      doc.addImage(canvas.toDataURL("image/png"), "PNG", W - M - 80, y - 10, 80, 80 * canvas.height / canvas.width, undefined, "FAST");
+    } catch (e) { /* no logo */ }
+    y += 22;
+    const now = new Date(), today = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...muted);
+    doc.text(doc.splitTextToSize(`${caseTitle(c)} · ${c.reference} · prepared ${today} by Click2Check from the credit report and Open Banking; every figure says where it came from (DEMO: fictional sample data)`, width - 100), M, y);
+    y += 22; doc.setTextColor(...ink);
+    const table = (head, body, opts) => {
+      doc.autoTable({ startY: y, head: [head], body: body, theme: "plain", rowPageBreak: "avoid",
+        margin: { left: M, right: M, top: 40, bottom: 46 },
+        styles: { fontSize: 8, cellPadding: 3.5, textColor: ink, lineColor: [225, 225, 228], lineWidth: { bottom: 0.4 }, valign: "top" },
+        headStyles: { fontStyle: "bold", textColor: muted, fontSize: 7.5, fillColor: light },
+        columnStyles: opts.columns,
+        didParseCell: (d) => {
+          if (d.section !== "body") return;
+          const kind = d.row.raw._kind;
+          if (kind === "band") { d.cell.styles.fillColor = grey; d.cell.styles.fontStyle = "bold"; }
+          if (kind === "total") { d.cell.styles.fillColor = light; d.cell.styles.fontStyle = "bold"; }
+          if (kind === "result") { d.cell.styles.fontStyle = "bold"; d.cell.styles.fontSize = 9.5; d.cell.styles.lineColor = pink; d.cell.styles.lineWidth = { top: 1.2 }; }
+          if (kind === "zero") d.cell.styles.textColor = muted;
+          if (d.column.index === opts.source && TAG[String(d.cell.raw).split(", ")[0]]) {
+            const t = TAG[String(d.cell.raw).split(", ")[0]];
+            d.cell.styles.fillColor = t[0]; d.cell.styles.textColor = t[1]; d.cell.styles.fontStyle = "bold"; d.cell.styles.fontSize = 6.8;
+            d.cell.text = String(d.cell.raw).toUpperCase().split(", ");
+          }
+          if (opts.right && opts.right.includes(d.column.index)) d.cell.styles.halign = "right";
+        } });
+      y = doc.lastAutoTable.finalY + 14;
+    };
+    const tag = (rows, kind) => { rows._kind = kind; return rows; };
+    const band = (text, n) => tag([{ content: text, colSpan: n }], "band");
+
+    // Each applicant's income.
+    if ((c.income_detail || []).length) {
+      const body = [];
+      c.income_detail.forEach((a) => {
+        body.push(band(`Applicant ${a.n}: ${a.who}`, 3));
+        a.rows.forEach((r) => body.push([r.label + (r.note ? `\n${r.note}` : ""), r.value, r.from.join(", ")]));
+      });
+      table(["Income, each applicant", "Figure", "From"], body, { source: 2, right: [1], columns: { 0: { cellWidth: width * 0.55 }, 1: { cellWidth: width * 0.25 }, 2: { cellWidth: width * 0.2 } } });
+    }
+
+    if (form) {
+      const sections = formSections(c, key), add = (rows) => rows.filter((r) => !r.total).reduce((s, r) => s + r.value, 0);
+      const outgoings = sections.reduce((s, x) => s + add(x.rows), 0), net = E.num((c.factfind.data.summary || {}).net_monthly_income);
+      const body = [];
+      sections.forEach((s) => {
+        body.push(band(s.title, 4));
+        s.rows.forEach((r) => {
+          if (r.total) { body.push(tag([r.label, gbp(r.value), r.source, ""], "total")); return; }
+          body.push(tag([r.label + (r.definition ? `\n${r.definition}` : ""), gbp(r.value), r.source === "–" ? "" : r.source,
+                         (r.category ? r.category + "\n" : "") + r.note], r.value ? "" : "zero"));
+        });
+        body.push(tag([`Total ${s.title}`, gbp(add(s.rows)), "", ""], "total"));
+      });
+      body.push(tag(["Total outgoings", gbp(outgoings), "", ""], "total"));
+      body.push(["Total net monthly income", gbp(net), "Open Banking", "Each applicant's pay into the bank, a month."]);
+      body.push(tag(["Left over", gbp(net - outgoings), "", ""], "result"));
+      table([name, "£ a month", "Source", "Bank report category · detail"], body,
+            { source: 2, right: [1], columns: { 0: { cellWidth: width * 0.24 }, 1: { cellWidth: width * 0.11 }, 2: { cellWidth: width * 0.14 }, 3: { cellWidth: width * 0.51, fontSize: 7, textColor: [90, 90, 96] } } });
+    } else {
+      const body = [band(key === "categories" ? "Household income" : "Income", 3)];
+      const line = (r) => tag([r.label + (r.before_tax ? `\nAfter tax; before tax ${gbp(r.before_tax)}` : "") + (r.made_of && r.made_of.length && !(r.made_of.length === 1 && r.made_of[0] === r.label) ? `\n${r.made_of.join(", ")}` : ""),
+                               gbp(r.value), r.from.join(", ")], E.num(r.value) ? "" : "zero");
+      b.income.forEach((r) => body.push(line(r)));
+      body.push(tag(["Total income", gbp(b.income_total), ""], "total"));
+      b.sections.forEach((s) => {
+        body.push(band(s.title, 3));
+        s.rows.forEach((r) => body.push(line(r)));
+        if (s.total) body.push(tag([s.total.label, gbp(s.total.value), ""], "total"));
+      });
+      body.push(tag([b.result.label, gbp(b.result.value), ""], "result"));
+      table([`Client name: ${caseTitle(c)}`, "£ a month", "From"], body,
+            { source: 2, right: [1], columns: { 0: { cellWidth: width * 0.6 }, 1: { cellWidth: width * 0.18 }, 2: { cellWidth: width * 0.22 } } });
+    }
+    doc.setFontSize(7.5); doc.setTextColor(...muted);
+    if (y > H - 70) { doc.addPage(); y = 46; }
+    doc.text(doc.splitTextToSize("Every figure is from the customer's credit report or Open Banking, as C2C's fact find took it, or as the customer gave it where marked. Nothing here decides anything: it is for the adviser to check with the customer.", width), M, y);
+    const pages = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(...muted);
+      doc.text(`${c.reference} · ${name} · Click2Check`, M, H - 22);
+      doc.text(`Page ${i} of ${pages}`, W - M, H - 22, { align: "right" });
+    }
+    doc.save(`${c.reference} ${form ? name : `budget planner (${name})`}.pdf`);
   }
 
   // Mortgage Experience's fact find, the parts C2C fills (cases/mortgage_experience.py):
