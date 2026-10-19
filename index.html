@@ -1658,6 +1658,7 @@
     return `<div class="panel budget" data-budget-layout="${key}"${key === budgetLayout ? "" : " hidden"}>
       <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${key === "c2c" ? "C2C's budget planner (Expenditure Categories)" : "C2C's Mortgage Expenditure Form, with its credit card and loan sheets filled from the credit report"}, prepopulated: the Excel adds an Adviser flags sheet.</span>
         <button class="btn-secondary" data-budget-pdf="${key}">Download (PDF)</button>
+        <button class="btn-secondary" data-budget-pdf="${key}" data-blank>Download (PDF, detail blank)</button>
         <button class="btn-secondary" data-budget-xlsx="${key}">Download (Excel)</button></p>
       ${incomeTableHtml(c, fromPill)}
       <div class="table-wrap"><table class="budget-table prepop"><thead><tr><th>${key === "c2c" ? "Budget planner" : "Mortgage Expenditure Form"}: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>Source</th><th>Bank report category · detail</th></tr></thead><tbody>
@@ -2066,7 +2067,7 @@
       if (n) { n.withdrawn = true; save(); renderCase(); }
     }));
     document.querySelectorAll("#case-view [data-budget-xlsx]").forEach((b) => b.addEventListener("click", () => budgetXlsx(c, b.dataset.budgetXlsx)));
-    document.querySelectorAll("#case-view [data-budget-pdf]").forEach((b) => b.addEventListener("click", () => budgetPdf(c, b.dataset.budgetPdf)));
+    document.querySelectorAll("#case-view [data-budget-pdf]").forEach((b) => b.addEventListener("click", () => budgetPdf(c, b.dataset.budgetPdf, b.hasAttribute("data-blank"))));
     if ($("me-pdf")) $("me-pdf").addEventListener("click", () => makeOutput(c, "me", "me-pdf"));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
     $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
@@ -2122,7 +2123,8 @@
   // A budget planner view as a PDF: the layout's lines, each with its figure
   // and where it came from (and, for the C2C forms, the bank category and who
   // was paid), after each applicant's income.
-  async function budgetPdf(c, key) {
+  // ``blank``: the detail column is left empty, for the adviser to fill in.
+  async function budgetPdf(c, key, blank) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 36, width = W - 2 * M;
@@ -2189,12 +2191,12 @@
         s.rows.forEach((r) => {
           if (r.total) { body.push(tag([r.label, gbp(r.value), r.source, ""], "total")); return; }
           body.push(tag([r.label + (r.definition ? `\n${r.definition}` : ""), gbp(r.value), r.source === "–" ? "" : r.source,
-                         (r.category ? r.category + "\n" : "") + r.note], r.value ? "" : "zero"));
+                         blank ? "" : (r.category ? r.category + "\n" : "") + r.note], r.value ? "" : "zero"));
         });
         body.push(tag([`Total ${s.title}`, gbp(add(s.rows)), "", ""], "total"));
       });
       body.push(tag(["Total outgoings", gbp(outgoings), "", ""], "total"));
-      body.push(["Total net monthly income", gbp(net), "Open Banking", "Each applicant's pay into the bank, a month."]);
+      body.push(["Total net monthly income", gbp(net), "Open Banking", blank ? "" : "Each applicant's pay into the bank, a month."]);
       body.push(tag(["Left over", gbp(net - outgoings), "", ""], "result"));
       table([name, "£ a month", "Source", "Bank report category · detail"], body,
             { source: 2, right: [1], columns: { 0: { cellWidth: width * 0.24 }, 1: { cellWidth: width * 0.11 }, 2: { cellWidth: width * 0.14 }, 3: { cellWidth: width * 0.51, fontSize: 7, textColor: [90, 90, 96] } } });
@@ -2222,7 +2224,7 @@
       doc.text(`${c.reference} · ${name} · Click2Check`, M, H - 22);
       doc.text(`Page ${i} of ${pages}`, W - M, H - 22, { align: "right" });
     }
-    doc.save(`${c.reference} ${form ? name : `budget planner (${name})`}.pdf`);
+    doc.save(`${c.reference} ${form ? name : `budget planner (${name})`}${blank ? " (detail blank)" : ""}.pdf`);
   }
 
   // Mortgage Experience's fact find, the parts C2C fills (cases/mortgage_experience.py):
