@@ -1124,6 +1124,7 @@
   function makeOutput(c, kind, button) {
     if (kind === "report") return downloadReport(c, button);
     if (kind === "standard") return downloadStandard(c, button);
+    if (kind === "me") return writeMePdf(c, button);
     const t = D.templates.find((x) => x.id === kind), st = state.templates[kind];
     if (!t || !st || !st.saved) { alert("Save that template's mapping first."); return Promise.resolve(); }
     return fillTemplate(t, st, c, button);
@@ -1599,6 +1600,7 @@
       ${Object.keys(FORMS).map((key) => formHtml(c, key, fromPill)).join("")}
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
         <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
+          ${b.key === "me" ? `<button class="btn-primary" id="me-pdf">Mortgage Experience fact find (PDF)</button>` : ""}
           <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
         ${incomeTableHtml(c, fromPill)}
         <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
@@ -1966,7 +1968,7 @@
       <section class="tab-panel" data-tab="outputs"${caseTab === "outputs" ? "" : " hidden"}>
       <div class="section" data-src="all"><h2>Outputs</h2>
         <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
-          <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option>
+          <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option><option value="me">Mortgage Experience fact find (PDF)</option>
             ${D.templates.map((t) => { const ready = state.templates[t.id] && state.templates[t.id].saved;
               return `<option value="${esc(t.id)}" ${ready ? "" : "disabled"}>${esc(t.name)} (${t.kind === "PDF" ? "Fillable PDF" : "Excel"})${ready ? "" : " – mapping not saved"}</option>`; }).join("")}</select>
             <button class="btn-primary" id="out-create">Create</button></div>
@@ -2062,6 +2064,7 @@
       if (n) { n.withdrawn = true; save(); renderCase(); }
     }));
     document.querySelectorAll("#case-view [data-budget-xlsx]").forEach((b) => b.addEventListener("click", () => budgetXlsx(c, b.dataset.budgetXlsx)));
+    if ($("me-pdf")) $("me-pdf").addEventListener("click", () => makeOutput(c, "me", "me-pdf"));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
     $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
     document.querySelectorAll("[data-output]").forEach((b) => b.addEventListener("click", () => {
@@ -2110,6 +2113,128 @@
       const wb = await standardWorkbook(c);
       download(new Blob([await wb.xlsx.writeBuffer()]), `${c.reference} C2C expenditure form.xlsx`);
       made(c, "standard", `${c.reference} C2C expenditure form.xlsx`, button);
+    });
+  }
+
+  // Mortgage Experience's fact find, the parts C2C fills (cases/mortgage_experience.py):
+  // credit history, employment & income, liabilities and the budget planner,
+  // every answer with where it came from.
+  function writeMePdf(c, button) {
+    return withButton(button, "Writing the fact find…", async () => {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 42, width = W - 2 * M;
+      const ink = [28, 27, 31], muted = [123, 123, 123], pink = [230, 23, 88];
+      const TAG = { "Credit report": [[253, 227, 235], [163, 15, 63]], "Open Banking": [[223, 243, 238], [31, 122, 99]],
+                    "Adviser to ask": [[239, 239, 241], [107, 107, 112]], Customer: [[253, 240, 220], [138, 90, 6]],
+                    "Fact find": [[253, 240, 220], [138, 90, 6]], Adviser: [[239, 239, 241], [107, 107, 112]] };
+      const me = c.me || { credit: [], liabilities: [] };
+      let y = 46;
+      const room = (h) => { if (y + h > H - 50) { doc.addPage(); y = 46; } };
+      const band = (text) => {
+        room(60); doc.setFillColor(...pink); doc.rect(M, y, width, 20, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(255, 255, 255);
+        doc.text(text, M + 6, y + 14); doc.setTextColor(...ink); doc.setFont("helvetica", "normal"); y += 26;
+      };
+      const h3 = (text, after) => {
+        room(50); doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.text(text, M, y + 10);
+        if (after) { const w = doc.getTextWidth(text); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...muted); doc.text(after, M + w + 6, y + 10); doc.setTextColor(...ink); }
+        doc.setFont("helvetica", "normal"); y += 16;
+      };
+      // rows: [label, value, source]; a value may be [[text, source], ...].
+      const rows = (list, indent) => {
+        const body = [];
+        list.forEach(([label, value, source]) => {
+          const tail = label && !/\?$/.test(label) ? ":" : "";
+          if (Array.isArray(value)) value.forEach(([text, src], i) => body.push([i ? "" : label + tail, text, src || ""]));
+          else body.push([label ? label + tail : "", value === "" ? "not in the reports" : String(value), source || ""]);
+        });
+        doc.autoTable({ startY: y, body: body, theme: "plain", margin: { left: M, right: M, top: 46, bottom: 50 }, rowPageBreak: "avoid",
+          styles: { fontSize: 8.5, cellPadding: { top: 3, bottom: 3, left: 3, right: 3 }, textColor: ink, lineColor: [220, 220, 223], lineWidth: { bottom: 0.4 } },
+          columnStyles: { 0: { cellWidth: width * 0.42 }, 1: { cellWidth: width * 0.38 }, 2: { cellWidth: width * 0.2 } },
+          didParseCell: (d) => {
+            if (d.column.index === 0 && indent) d.cell.styles.cellPadding = { top: 3, bottom: 3, left: 3 + indent, right: 3 };
+            if (d.column.index === 1 && d.cell.raw === "not in the reports") d.cell.styles.textColor = [154, 154, 160];
+            if (d.column.index === 2 && TAG[d.cell.raw]) {
+              d.cell.styles.fillColor = TAG[d.cell.raw][0]; d.cell.styles.textColor = TAG[d.cell.raw][1];
+              d.cell.styles.fontStyle = "bold"; d.cell.styles.fontSize = 6.8; d.cell.text = [String(d.cell.raw).toUpperCase()];
+            }
+          } });
+        y = doc.lastAutoTable.finalY + 6;
+      };
+      const money = (v) => gbp(v);
+
+      // Heading, the case, and the key.
+      doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...ink);
+      doc.text("Fact find: credit and budget planner", M, y + 12);
+      try {
+        const img = await new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = "logo.png"; });
+        const canvas = document.createElement("canvas"); canvas.width = 384; canvas.height = Math.round(384 * img.height / img.width);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        doc.addImage(canvas.toDataURL("image/png"), "PNG", W - M - 80, y - 8, 80, 80 * canvas.height / canvas.width, undefined, "FAST");
+      } catch (e) { /* no logo */ }
+      y += 24;
+      const now = new Date(), today = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...muted);
+      doc.text(doc.splitTextToSize(`${c.factfind.data.applicants.map((a) => a.full_name).join(", ")} · ${c.reference} · prepared ${today} by Click2Check from the credit report and Open Banking, in Mortgage Experience's sections (DEMO: fictional sample data)`, width - 100), M, y);
+      y += 16; doc.setTextColor(...ink);
+      rows([["Credit report", "from the credit report", "Credit report"], ["Open Banking", "from Open Banking (the bank statements)", "Open Banking"],
+            ["Customer", "as the customer gave it", "Customer"], ["Adviser to ask", "not in either report: for the adviser to ask", "Adviser to ask"]]
+        .map(([, text, src]) => ["", text, src]));
+      y += 6;
+
+      // Credit history, each applicant.
+      band("Credit history");
+      me.credit.forEach((a) => {
+        h3(`Applicant ${a.n}: ${a.who}`, `· credit report dated ${a.report_date}`);
+        if (!a.questions) { doc.setFontSize(8); doc.text("No credit report for this applicant.", M, y + 8); y += 16; return; }
+        a.questions.forEach((q) => {
+          rows([[q.q, q.answer, q.source]]);
+          q.items.forEach((item) => { y -= 6; rows(item.map(([label, value]) => [label, value, q.source]), 14); });
+        });
+      });
+
+      // Employment & income.
+      y += 6; band("Employment & income");
+      (c.income_detail || []).forEach((a) => {
+        h3(`Applicant ${a.n}: ${a.who}`);
+        rows(a.rows.map((r) => [r.label, r.value + (r.note ? `\n${r.note}` : ""), r.from[0] || "Adviser to ask"]));
+      });
+
+      // Liabilities.
+      y += 6; band("Liabilities");
+      me.liabilities.forEach((x) => {
+        h3(x.title);
+        rows([[x.question, x.answer, x.source]]);
+        x.items.forEach((item) => { room(80); doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text(item.name, M, y + 8); doc.setFont("helvetica", "normal"); y += 12; rows(item.rows); });
+      });
+
+      // The budget planner, as the case stands now.
+      const b = E.budgetPlanner(c, "me", D.budget_layouts, D.lines), spec = D.budget_layouts.me;
+      const line = (r) => {
+        const made = r.made_of.length === 1 && r.made_of[0] === r.label ? [] : r.made_of;
+        if (!E.num(r.value)) return [r.label, `${money(0)} Monthly`, ""];
+        return [r.label, [[`${money(r.value)} Monthly` + (made.length ? `\n${made.join(", ")}` : ""), r.from[0] || ""]].concat(r.from.slice(1).map((s) => ["", s])), null];
+      };
+      y += 6; band("Budget planner - Current position");
+      b.sections.forEach((s) => { h3(s.title); rows(s.rows.map(line).concat([["Total", money(s.total.value), ""]])); });
+      h3("Monthly income"); rows(b.income.map(line).concat([["Total monthly income", money(b.income_total), ""]]));
+      const groups = Object.entries(spec.groups || {}).map(([name, parts]) => [name, b.sections.reduce((t, sec) =>
+        t + sec.rows.filter((r) => parts.includes(sec.title) || parts.includes(r.label)).reduce((u, r) => u + E.num(r.value), 0), 0)]);
+      h3("Monthly expenditure"); rows(groups.map(([name, v]) => [name, money(v), ""]).concat([["Total", money(b.outgoings_total), ""]]));
+      h3("Disposable income"); rows([["Total monthly expenditure", money(b.outgoings_total), ""], ["Total monthly disposable income", money(b.result.value), ""]]);
+      room(40); doc.setFontSize(7.5); doc.setTextColor(...muted);
+      doc.text(doc.splitTextToSize("Every figure is from the customer's credit report or Open Banking, as C2C's fact find took it; a line made of several budget lines lists them under its figure. Nothing here decides anything: it is for the adviser to check with the customer and enter in Mortgage Experience.", width), M, y + 8);
+
+      const pages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pages; i++) {
+        doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(...muted);
+        doc.text(`${c.reference} · Mortgage & Protection · Click2Check`, M, H - 24);
+        doc.text(`Page ${i} of ${pages}`, W - M, H - 24, { align: "right" });
+      }
+      const name = `${c.reference} fact find (Mortgage Experience).pdf`;
+      doc.save(name);
+      made(c, "me", name, button);
     });
   }
 
