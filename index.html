@@ -663,10 +663,10 @@
     <p class="subtitle" style="max-width:640px">C2C doesn't just collect reports. It checks them against each other and against the customer, then fills whichever form the firm uses.</p>
     <ol class="flow">
       <li><strong>Start from the hub.</strong> Affordability starts once the hub has each person's credit report and Open Banking (several banks). That is all it needs, and the case opens with both.</li>
-      <li><strong>Open Banking aggregate.</strong> Accounts connected twice are merged, overlapping feeds de-duplicated, transfers between the customer's own accounts paired, and every transaction placed on a budget planner line. <span class="tag code">RULES · ACCOUNTSCORE MAP · MERCHANT MEMORY · TRAINED MODEL</span></li>
+      <li><strong>Open Banking aggregate.</strong> Accounts connected twice are merged, overlapping feeds de-duplicated, transfers between the customer's own accounts paired, and every transaction placed on a budget planner line: by rules, AccountScore's category and merchant memory first, then AI for merchants none of them know, each with its reason (simulated in this demo). <span class="tag code">RULES FIRST</span> <span class="tag ai">AI FOR THE UNKNOWN</span></li>
       <li><strong>C2C Data Pack.</strong> Every party's credit report and banking in one file. Residential and commercial use the same model; a commercial case adds the company, and each director gets the same personal checks.</li>
       <li><strong>Validate.</strong> What the customer entered is compared with both sources: income against pay into the bank, commitments against the credit report and the bank, spending against the bank. Differences are flagged.</li>
-      <li><strong>Source figures by default.</strong> The fact find is made with the reports' figures, not what the customer entered, and each one is on the audit trail. The customer isn't asked; the broker can keep the customer's figure instead, with a reason, and decides what has no figure to take. <span class="tag code">NO AI ON A CASE</span></li>
+      <li><strong>Source figures by default.</strong> The fact find is made with the reports' figures, not what the customer entered, and each one is on the audit trail. The customer isn't asked; the broker can keep the customer's figure instead, with a reason, and decides what has no figure to take. <span class="tag code">EVERY FIGURE TRACED</span></li>
       <li><strong>Fact find and budget planner.</strong> Populated and validated, on the lines of the C2C Mortgage Expenditure Form, with where each figure came from.</li>
       <li><strong>Fill any template.</strong> The C2C form, or the firm's or lender's own PDF, Excel or form fields. AI proposes how a new template maps; a person approves it once, and from then on it fills every case. <span class="tag ai">AI PROPOSES · PERSON APPROVES</span></li>
       <li><strong>Back to the hub.</strong> The hub is told when the case opens, when the broker approves, and when a form or case report is ready. Each notice is signed and carries no personal data; the hub fetches the case with its own key.</li>
@@ -705,7 +705,7 @@
                    C2C: "C2C", CUSTOMER: "Customer" };
   const OUTCOME = { DIFFERENCE: "DIFFERENCE", ALERT: "ALERT", UNVERIFIABLE: "TO CHECK", MATCH: "MATCH" };
   const label = (v) => SOURCE[v] || (String(v).charAt(0) + String(v).slice(1).toLowerCase()).replace(/_/g, " ");
-  const BASIS = { RULE: "Rule", PROVIDER: "AccountScore category", MEMORY: "Merchant memory",
+  const BASIS = { AI: "AI (simulated in this demo)", RULE: "Rule", PROVIDER: "AccountScore category", MEMORY: "Merchant memory",
                   OVERRIDE: "Broker", PATTERN: "Regular pay", MODEL: "Trained model",
                   MATCHED_TRANSFER: "Own transfer", NONE: "Needs a broker" };
   const CAT = {}; D.categories.forEach((c) => { CAT[c.value] = c.label; });
@@ -1034,6 +1034,14 @@
         flag("CHECK", `${s2.payer} varies: ${gbp(s2.low)} to ${gbp(s2.high)} a month (${p.who})`,
              `Usually ${gbp(s2.usual)}; moves ${s2.moves}% between months.${s2.high_months.length ? ` Higher in ${s2.high_months.join(", ")}.` : ""}`, "income", "", ["hl:pattern:" + p.party]);
     }));
+    // What the AI placed, so the adviser knows which lines to glance at.
+    const companies = new Set(c.parties.filter((p) => p.role === "COMPANY").map((p) => p.key));
+    const placed = c.transactions.filter((t) => t.basis === "AI" && !companies.has(t.party));
+    if (placed.length) {
+      const names = [...new Set(placed.map((t) => t.description))].sort();
+      flag("CHECK", `${placed.length} transaction${placed.length > 1 ? "s" : ""} placed by AI`,
+           `Merchants the rules didn't know: ${names.slice(0, 6).join(", ")}${names.length > 6 ? "…" : ""}. Each says why on the Open Banking statement; change any that are wrong.`, "transactions");
+    }
     (ins.freshness || []).filter((f) => f.stale).forEach((f) => flag("CHECK", `${f.source} for ${f.who} is ${f.days} days old`,
       `Dated ${f.date}; a newer one would show the latest.`, "sources"));
     return out.sort((a, b) => FLAG_ORDER[a.level] - FLAG_ORDER[b.level]);
@@ -1367,7 +1375,7 @@
               data-date="${esc(t.date)}" data-amount="${esc(t.amount)}" data-search="${esc([t.description, t.primary, t.sub, t.provider].join(" ").toLowerCase())}">
             <td class="st-date" style="white-space:nowrap">${dayLabel(t.date)}</td>
             <td class="small muted" style="white-space:nowrap">${esc(t.who)}<br>${esc(t.accountName)}</td>
-            <td>${esc(t.description)}<br><span class="small muted">${t.business ? `Business account · money ${E.num(t.amount) < 0 ? "out" : "in"}` : esc(t.primary) + (t.sub ? " &gt; " + esc(t.sub) : "")}${t.provider ? ` · <span class="mono">${esc(t.provider)}</span>` : ""}</span></td>
+            <td>${esc(t.description)}<br><span class="small muted">${t.business ? `Business account · money ${E.num(t.amount) < 0 ? "out" : "in"}` : esc(t.primary) + (t.sub ? " &gt; " + esc(t.sub) : "")}${t.provider ? ` · <span class="mono">${esc(t.provider)}</span>` : ""}${t.reason ? ` · AI: ${esc(t.reason)}` : ""}</span></td>
             <td class="mono" title="${esc(CODES[t.code] || "")}">${esc(t.code || "–")}</td>
             <td class="num"><strong>${gbp(t.amount)}</strong></td>
             <td class="num">${t.balance === null ? '<span class="muted">–</span>' : gbp(t.balance)}</td>
@@ -1959,7 +1967,7 @@
 
       <section class="tab-panel" data-tab="bank"${caseTab === "bank" ? "" : " hidden"}>
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
-        <p class="section-note">No AI here: each transaction is placed by a rule, AccountScore's own category, merchant memory or a broker, and says which. Every transaction, with its balance, category and filters, is on the Open Banking statement, above.</p>
+        <p class="section-note">Each transaction is placed by a rule, AccountScore's own category or merchant memory; AI places only what none of those know, with a reason; a broker decides the rest. Each says which. Every transaction, with its balance, category and filters, is on the Open Banking statement, above.</p>
         ${toCategorise || '<div class="panel small">Every transaction is categorised.</div>'}</div>` : ""}
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>How the accounts were put together<span class="count">one per person or company</span></h2>
         <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired.</p>

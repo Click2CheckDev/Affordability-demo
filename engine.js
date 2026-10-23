@@ -250,11 +250,11 @@
   function recategorise(cases, kase, txId, category, remember, who, demo) {
     const tx = kase.transactions.find((t) => t.id === txId);
     if (!tx) return false;
-    tx.category = category; tx.basis = "OVERRIDE";
+    tx.category = category; tx.basis = "OVERRIDE"; delete tx.reason;
     if (remember && tx.merchant) {
       cases.forEach((c) => c.transactions.forEach((t) => {
         if (t !== tx && t.merchant === tx.merchant && t.basis !== "OVERRIDE") {
-          t.category = category; t.basis = "MEMORY";
+          t.category = category; t.basis = "MEMORY"; delete t.reason;
         }
       }));
     }
