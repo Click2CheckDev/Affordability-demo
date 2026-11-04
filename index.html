@@ -741,6 +741,7 @@
   const blocking = (c) => openFindings(c).filter((f) => f.outcome === "DIFFERENCE").length;
   const pill = (cls, text) => `<span class="status-pill ${esc(cls)}">${esc(text)}</span>`;
   function caseTitle(c) {
+    if (c.titleOverride) return c.titleOverride;
     if (c.company) return c.company;
     const people = c.factfind.data.applicants.map((a) => a.full_name);
     if (people.length === 2 && people[0].split(" ").pop() === people[1].split(" ").pop()) {
@@ -1598,17 +1599,54 @@
   // Each credit report on its own, as it arrived.
   // The budget planner: the form or the CRM's categories (cases/_budget_planner.html).
   let budgetLayout = Object.keys(D.budget_layouts)[0];
-  function budgetHtml(c) {
+  // One person of the case, for their own budget planner: their pay, what
+  // their own accounts pay out on each line (a month, over their complete
+  // months), and the credit agreements in their name. A line the customer gave
+  // for the whole household isn't split between people.
+  function personCase(c, key) {
+    const p = c.parties.find((x) => x.key === key), data = c.factfind.data;
+    const idx = data.applicants.findIndex((a) => a.key === key), me = data.applicants[idx] || {};
+    const mine = c.transactions.filter((t) => t.party === key), months = { [key]: c.months[key] || [] };
+    const bank = E.bankLines({ transactions: mine, months: months }).lines;
+    const commitments = (data.commitments || []).map((cm) => cm && cm.owner === key ? cm : null);
+    const credit = {};
+    commitments.forEach((cm) => { if (cm) { const l = E.creditLineFor(cm.type, D.lines); credit[l] = (credit[l] || 0) + E.num(cm.monthly_payment); } });
+    const expenditure = {}, prov = Object.assign({}, c.factfind.provenance);
+    D.lines.forEach((l) => {
+      const v = l.commitment_types.length ? credit[l.key] || 0 : bank[l.key] || 0;
+      expenditure[l.key] = v.toFixed(2);
+      if (!l.commitment_types.length) prov[`expenditure.${l.key}`] = { origin: "OPEN_BANKING", status: "DERIVED" };
+    });
+    const income = me.income || {};
+    const out = Object.assign({}, c, {
+      person: key, titleOverride: p.name, reference: `${c.reference} ${p.name}`, parties: [p], transactions: mine, months: months,
+      accounts: { [key]: c.accounts[key] }, income_detail: (c.income_detail || []).filter((a) => a.who === p.name),
+      factfind: Object.assign({}, c.factfind, { provenance: prov, data: Object.assign({}, data, {
+        applicants: data.applicants.map((a, i) => i === idx ? a : Object.assign({}, a, { income: {} })),
+        expenditure: expenditure, commitments: commitments,
+        summary: Object.assign({}, data.summary, { net_monthly_income: E.num(income.net_monthly).toFixed(2),
+                                                   gross_annual_income: String(E.num(income.total)) }) }) }) });
+    if (c.me) out.me = { credit: c.me.credit.filter((a) => a.who === p.name), liabilities: c.me.liabilities.map((x) => {
+      const items = x.items.filter((it) => it.rows.some((r) => r[0] === "Owner" && String(r[1]).includes(p.name)));
+      return Object.assign({}, x, { items: items, answer: items.length ? "Yes" : "No", source: items.length ? x.source : "Credit report" });
+    }) };
+    return out;
+  }
+  // The people with bank data of their own, when the case has more than one party.
+  const budgetPeople = (c) => c.parties.length > 1 ? c.parties.filter((p) => p.role !== "COMPANY" && (c.months[p.key] || []).length) : [];
+
+  function budgetHtml(c, person) {
     const fromPill = (f) => pill(f === "Credit report" ? "difference" : f === "Open Banking" ? "verified" : "derived", f);
     const layouts = Object.keys(D.budget_layouts).map((k) => E.budgetPlanner(c, k, D.budget_layouts, D.lines));
     const tabs = layouts.map((b) => [b.key, b.name]).concat(Object.entries(FORMS));
-    return `<div class="section" data-src="all"><h2 id="budget">Budget planner</h2>
-      <p class="section-note">The fact find as a budget planner: every figure from the bank statements and credit report, line by line, with where it came from. The CRM's categories, or the C2C forms prepopulated: each line's source, the bank category or credit report account behind it, and who was paid, month by month.</p>
+    return `<div class="section" data-src="${person ? "person:" + esc(person.key) : "all"}"><h2${person ? "" : ' id="budget"'}>Budget planner${person ? ` · ${esc(person.name)}` : ""}</h2>
+      <p class="section-note">${person ? `${esc(person.name)}'s own budget: their pay, what their own accounts pay out on each line (from the bank statements), and the credit agreements in their name (from the credit report). A figure the customer gave for the whole household isn't split between people: it's on the household's budget planner.`
+        : "The fact find as a budget planner: every figure from the bank statements and credit report, line by line, with where it came from. The CRM's categories, or the C2C forms prepopulated: each line's source, the bank category or credit report account behind it, and who was paid, month by month."}</p>
       <div class="budget-switch">${tabs.map(([key, name]) => `<button data-budget="${key}" class="${key === budgetLayout ? "active" : ""}">${esc(name)}</button>`).join("")}</div>
       ${Object.keys(FORMS).map((key) => formHtml(c, key, fromPill)).join("")}
       ${layouts.map((b) => `<div class="panel budget" data-budget-layout="${b.key}"${b.key === budgetLayout ? "" : " hidden"}>
         <p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
-          ${b.key === "me" ? `<button class="btn-primary" id="me-pdf">Mortgage Experience fact find (PDF)</button>` : ""}
+          ${b.key === "me" ? `<button class="btn-primary" data-me-pdf>Mortgage Experience fact find (PDF)</button>` : ""}
           <button class="btn-secondary" data-budget-pdf="${b.key}">Download (PDF)</button>
           <button class="btn-secondary" data-budget-xlsx="${b.key}">Download (Excel)</button></p>
         ${incomeTableHtml(c, fromPill)}
@@ -1952,7 +1990,7 @@
 
       ${panel("summary", summaryHtml(c))}
 
-      ${panel("budget", budgetHtml(c))}
+      ${panel("budget", budgetHtml(c) + budgetPeople(c).map((p) => budgetHtml(personCase(c, p.key), p)).join(""))}
 
       ${panel("income", bankReportHtml(c))}
 
@@ -2074,9 +2112,14 @@
       const n = (c.notes || []).find((x) => x.id === b.dataset.noteRemove);
       if (n) { n.withdrawn = true; save(); renderCase(); }
     }));
-    document.querySelectorAll("#case-view [data-budget-xlsx]").forEach((b) => b.addEventListener("click", () => budgetXlsx(c, b.dataset.budgetXlsx)));
-    document.querySelectorAll("#case-view [data-budget-pdf]").forEach((b) => b.addEventListener("click", () => budgetPdf(c, b.dataset.budgetPdf, b.hasAttribute("data-blank"))));
-    if ($("me-pdf")) $("me-pdf").addEventListener("click", () => makeOutput(c, "me", "me-pdf"));
+    // A download in a person's budget planner is made from their own figures.
+    const forButton = (b) => { const s = b.closest("[data-src]"), m = s && /^person:(.+)$/.exec(s.dataset.src); return m ? personCase(c, m[1]) : c; };
+    document.querySelectorAll("#case-view [data-budget-xlsx]").forEach((b) => b.addEventListener("click", () => budgetXlsx(forButton(b), b.dataset.budgetXlsx)));
+    document.querySelectorAll("#case-view [data-budget-pdf]").forEach((b) => b.addEventListener("click", () => budgetPdf(forButton(b), b.dataset.budgetPdf, b.hasAttribute("data-blank"))));
+    document.querySelectorAll("#case-view [data-me-pdf]").forEach((b) => b.addEventListener("click", () => {
+      const who = forButton(b);
+      return who === c ? makeOutput(c, "me", "me-pdf") : writeMePdf(who, null);
+    }));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
     $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
     document.querySelectorAll("[data-output]").forEach((b) => b.addEventListener("click", () => {
