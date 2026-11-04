@@ -430,6 +430,8 @@
   .source-picker button.pick-name:hover { color: var(--brand); }
   .source-picker button:hover { color: var(--ink); }
   .source-picker button.active { color: var(--ink); border-bottom-color: var(--brand); font-weight: 600; }
+  .source-picker button:disabled { opacity: .35; cursor: not-allowed; color: var(--muted); }
+  .source-picker button:disabled:hover { color: var(--muted); }
   .case-tabs { display: flex; gap: 2px; flex-wrap: wrap; }
   .case-tabs button { width: auto; height: 36px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; cursor: pointer;
                       padding: 0 12px; font: inherit; font-size: 13.5px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
@@ -1101,7 +1103,27 @@
       <div class="pick-row"><span class="pick-label">Show</span>${top.map(([v, n, m, o]) => button(v, n, m, o)).join("")}</div>
       ${rows.map(([key, name, own, value, match]) => `<div class="pick-row sub" data-sub-of="${esc(key)}" hidden><button class="pick-name" data-pick="${esc(value)}" data-match="${esc(match)}" data-owner="${esc(key)}" title="Everything for ${esc(name)}">${esc(name)}</button>${own.map(([v, n, m]) => button(v, n, m, key)).join("")}</div>`).join("")}</div>`;
   }
+  // A source the open tab shows nothing for (an account on the budget
+  // planner, say) can't be picked there; if it was, Show moves up to its person.
+  function pickable() {
+    const panel = document.querySelector("#case-view .tab-panel:not([hidden])");
+    if (!panel) return;
+    const shown = new Set([...panel.querySelectorAll("[data-src]")].flatMap((el) => el.dataset.src.split(" ")));
+    document.querySelectorAll("#case-view .source-picker [data-pick]").forEach((b) => {
+      // A tab that doesn't filter by source (the summary) leaves every source open.
+      const ok = !shown.size || b.dataset.match.split(" ").some((t) => shown.has(t));
+      if (!("title0" in b.dataset)) b.dataset.title0 = b.title || "";
+      b.disabled = !ok;
+      b.title = ok ? b.dataset.title0 : "Nothing for this source on this tab";
+    });
+    const chosen = document.querySelector(`#case-view [data-pick="${CSS.escape(pick)}"]`);
+    if (chosen && chosen.disabled) {
+      const up = document.querySelector(`#case-view [data-pick="person:${CSS.escape(chosen.dataset.owner || "")}"]`);
+      pick = up && !up.disabled ? up.dataset.pick : "all";
+    }
+  }
   function applyPick() {
+    pickable();
     let chosen = document.querySelector(`#case-view [data-pick="${CSS.escape(pick)}"]`);
     if (!chosen) { pick = "all"; chosen = document.querySelector('#case-view [data-pick="all"]'); }
     const match = chosen ? chosen.dataset.match.split(" ") : ["all"];
@@ -2037,6 +2059,7 @@
       caseTab = key;
       document.querySelectorAll("#case-view .tab-panel").forEach((p) => { p.hidden = p.dataset.tab !== key; });
       document.querySelectorAll("#case-view [data-tab-button]").forEach((b) => b.classList.toggle("active", b.dataset.tabButton === key));
+      applyPick();
     };
     document.querySelectorAll("#case-view [data-tab-button]").forEach((b) => b.addEventListener("click", () => {
       showTab(b.dataset.tabButton); window.scrollTo(0, 0);
