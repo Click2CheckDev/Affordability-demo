@@ -14,9 +14,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="demo-data.js?v=20261112154653"></script>
-<script src="simulated-ai.js?v=20261112154653"></script>
-<script src="engine.js?v=20261112154653"></script>
+<script src="demo-data.js?v=20261112154959"></script>
+<script src="simulated-ai.js?v=20261112154959"></script>
+<script src="engine.js?v=20261112154959"></script>
 <style>
 /* ---- Shared with the HMRC demo (click2checkdev.github.io/HMRC-demo), copied verbatim ---- */
   :root {
@@ -1710,7 +1710,7 @@
   // The C2C forms prepopulated (cases/prepopulated.py): every line with its
   // source, the bank category or credit report account, and what it is made of.
   // The Quilter budget planner form (Aly's), with what is still to come (planner/form.html).
-  function quilterHtml(c) {
+  function quilterHtml(c, person) {
     const b = E.budgetGaps(c, E.budgetPlanner(c, "form", { form: D.quilter_form }, D.lines), D.quilter_form, D.lines);
     const shown = (r) => (r.state === "waiting" && !r.customer_only ? '<span class="waiting-figure">Waiting</span>' : gbp(r.value)) + (r.state === "part" ? '<span class="part-mark">*</span>' : "");
     const from = (r) => (r.customer_only ? pill("declared", "Customer, not yet checked")
@@ -1719,11 +1719,12 @@
     const note = (r) => (r.waiting_text ? `<span class="waiting-note">${esc(r.waiting_text)}</span>` : "");
     const soFar = (on, text) => (on ? `<span class="so-far">${text || "so far"}</span>` : "");
     const who = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name).join(" & ");
-    return `<div class="section" data-src="all"><h2 id="quilter">Budget planner form</h2>
-      <p class="section-note">Quilter's budget planner form, filled from the checks that are in. Where a check is still to come, the lines it fills say so, and the totals are the figures so far.</p>
+    return `<div class="section" data-src="${person ? "person:" + esc(person.key) : "all"}"><h2${person ? "" : ' id="budget"'}>Budget planner${person ? ` · ${esc(person.name)}` : ""}</h2>
+      <p class="section-note">${person ? `${esc(person.name)}'s own figures.` : "Filled from the checks that are in, every line with where it came from."}</p>
       ${b.still_to_come.length ? `<div class="to-come"><strong>Still to come</strong><ul>${b.still_to_come.map((g) => `<li><strong>${esc(g.who)} · ${esc(g.name)}</strong>: adds ${esc(g.adds)}.</li>`).join("")}</ul></div>`
         : `<div class="all-in">All the checks are in: Open Banking and the credit report for ${esc(who)}.</div>`}
-      <div class="panel budget"><p class="small muted" style="margin:0 0 8px">${esc(b.note)}</p>
+      <div class="panel budget"><p class="small muted" style="margin:0 0 8px;display:flex;gap:12px;align-items:center"><span style="flex:1">${esc(b.note)}</span>
+        <button class="btn-secondary" data-budget-xlsx="form">Download (Excel)</button></p>
       <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
         <tr class="budget-head"><td colspan="3">Income</td></tr>
         ${b.income.map((r) => `<tr><td>${esc(r.label)}${r.before_tax ? `<br><span class="small muted">After tax; before tax ${gbp(r.before_tax)}</span>` : ""}${note(r)}</td><td class="num">${shown(r)}</td><td>${from(r)}</td></tr>`).join("")}
@@ -1907,7 +1908,7 @@
   async function budgetXlsx(c, key) {
     if (key === "c2c") return c2cXlsx(c);
     if (key === "mef") return mefXlsx(c);
-    const b = E.budgetPlanner(c, key, D.budget_layouts, D.lines);
+    const b = E.budgetPlanner(c, key, Object.assign({ form: D.quilter_form }, D.budget_layouts), D.lines);
     const wb = new window.ExcelJS.Workbook(), ws = wb.addWorksheet("Budget planner");
     ws.getColumn(1).width = 70; ws.getColumn(2).width = 16; ws.getColumn(3).width = 26;
     ws.getCell("A1").value = "Budget planner"; ws.getCell("A1").font = { bold: true, size: 14 };
@@ -2024,7 +2025,7 @@
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
     const tabs = [["summary", dot + (act ? "Worth a look" : check ? "For information" : "Nothing to note"), act + check],
-                  ["budget", "Budget planner"], ["quilter", "Budget planner form"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
+                  ["budget", "Budget planner"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
                   ["bank", "Bank transactions", Object.keys(waiting).length],
                   ["sources", "Sources"], ["outputs", "Outputs and audit"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
@@ -2054,9 +2055,7 @@
 
       ${panel("summary", summaryHtml(c))}
 
-      ${panel("budget", budgetHtml(c) + budgetPeople(c).map((p) => budgetHtml(personCase(c, p.key), p)).join(""))}
-
-      ${panel("quilter", quilterHtml(c))}
+      ${panel("budget", quilterHtml(c) + budgetPeople(c).map((p) => quilterHtml(personCase(c, p.key), p)).join(""))}
 
       ${panel("income", bankReportHtml(c))}
 
@@ -2084,6 +2083,7 @@
       <div class="section" data-src="all"><h2>Outputs</h2>
         <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
           <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option><option value="me">Mortgage Experience fact find (PDF)</option>
+            <option value="xlsx:categories">Budget planner, CRM categories (Excel)</option><option value="xlsx:c2c">C2C budget planner (Excel)</option>
             ${D.templates.map((t) => { const ready = state.templates[t.id] && state.templates[t.id].saved;
               return `<option value="${esc(t.id)}" ${ready ? "" : "disabled"}>${esc(t.name)} (${t.kind === "PDF" ? "Fillable PDF" : "Excel"})${ready ? "" : " – mapping not saved"}</option>`; }).join("")}</select>
             <button class="btn-primary" id="out-create">Create</button></div>
@@ -2188,7 +2188,10 @@
       return who === c ? makeOutput(c, "me", "me-pdf") : writeMePdf(who, null);
     }));
     $("dl-report").addEventListener("click", () => makeOutput(c, "report", "dl-report"));
-    $("out-create").addEventListener("click", () => makeOutput(c, $("out-template").value, "out-create"));
+    $("out-create").addEventListener("click", () => {
+      const v = $("out-template").value;
+      return v.startsWith("xlsx:") ? budgetXlsx(c, v.slice(5)) : makeOutput(c, v, "out-create");
+    });
     document.querySelectorAll("[data-output]").forEach((b) => b.addEventListener("click", () => {
       const o = c.outputs[+b.dataset.output];
       makeOutput(c, o.kind, null, true);
