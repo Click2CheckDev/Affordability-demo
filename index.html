@@ -14,9 +14,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="demo-data.js?v=20261112170332"></script>
-<script src="simulated-ai.js?v=20261112170332"></script>
-<script src="engine.js?v=20261112170332"></script>
+<script src="demo-data.js?v=20261112170756"></script>
+<script src="simulated-ai.js?v=20261112170756"></script>
+<script src="engine.js?v=20261112170756"></script>
 <style>
 /* ---- Shared with the HMRC demo (click2checkdev.github.io/HMRC-demo), copied verbatim ---- */
   :root {
@@ -691,6 +691,59 @@
     .case-tabs button { flex: none; padding: 0 12px; }
     .demo-what { display: none; }
   }
+
+  /* ---- The hub's own UI style for everything in the tab (mdn_credit components), 12 Nov 2026 ----
+     Tabs: VerticalTabs, horizontal (grey #7b7b7b text, the open tab bold in the brand colour, a 4px brand
+     line). Buttons: the hub's Button (brand fill, white, Roboto 15px bold, 6px corners, 33px high).
+     Panels: white, 3px corners, shadow 0 1px 2px 1px #dddbdb. Statuses: coloured text as in My Cases
+     (#40a35c done, #a7370b not done, #7b7b7b otherwise), not pills. Headings: 22px, 400, brand. */
+  .hub-section, .hub-section * { font-family: "Roboto", sans-serif; }
+  .hub-note { font-size: 14px; color: #7b7b7b; margin: 0 0 15px; }
+  .case-bar { border-bottom: 1px solid #cccccc; margin: 10px 0 25px; padding-top: 0; }
+  .case-tabs { gap: 0; }
+  .case-tabs button { height: 48px; padding: 0 24px; font-size: 14px; color: #7b7b7b; font-weight: 400;
+    border-bottom: 4px solid transparent; }
+  .case-tabs button:hover { color: var(--brand); }
+  .case-tabs button.active { color: var(--brand); font-weight: 700; border-bottom-color: var(--brand); }
+  .case-tabs .count, .case-tabs .count.act { background: none; color: inherit; font-size: inherit; font-weight: inherit; padding: 0; margin-left: 2px; }
+  /* Viewing: plain options, the chosen one in the brand colour. */
+  .pick-label { font-size: 14px; color: #7b7b7b; }
+  .pick-row button, .pick-row button.active { border: 0; border-radius: 0; background: none; padding: 6px 10px; font-size: 14px; color: #7b7b7b; }
+  .pick-row button.active { color: var(--brand); font-weight: 700; }
+  /* Buttons */
+  .hub-section .btn-primary, .hub-section .btn-secondary, .hub-section .btn-small {
+    font: 700 15px "Roboto", sans-serif; height: 33px; padding: 0 16px; border-radius: 6px; box-shadow: none; width: auto; }
+  .hub-section .btn-primary { background: var(--brand); border: 1px solid var(--brand); color: #fff; }
+  .hub-section .btn-secondary { background: #fff; border: 1px solid var(--brand); color: var(--brand); }
+  .hub-section .btn-primary:hover { background: var(--brand-ink); }
+  /* Statuses as coloured text, like the hub's My Cases. */
+  .hub-section .status-pill, .hub-section .cat-pill, .hub-section .flag {
+    background: none !important; padding: 0; border-radius: 0; font-size: 14px; font-weight: 500; color: #7b7b7b; }
+  .hub-section .status-pill.verified, .hub-section .status-pill.match, .hub-section .status-pill.delivered,
+  .hub-section .flag-OK { color: #40a35c; }
+  .hub-section .status-pill.alert, .hub-section .status-pill.difference, .hub-section .status-pill.missing,
+  .hub-section .flag-ACT { color: #a7370b; }
+  .hub-section .flag-CHECK { color: var(--brand); }
+  /* Panels: the hub's white panel. */
+  .stat-card, .review-item, .hub-section .panel { border: 0; border-radius: 3px; box-shadow: 0 1px 2px 1px #dddbdb; background: #fff; }
+  .review-item, .review-item.ACT { border-left: 0; }
+  .stat-card .stat-label { font-size: 14px; color: #7b7b7b; }
+  .stat-card .stat-value { font-size: 22px; font-weight: 400; color: #333; }
+  .stat-card.good .stat-value { color: #40a35c; }
+  .stat-card.bad .stat-value { color: #a7370b; }
+  .stat-card .stat-note { font-size: 13px; color: #7b7b7b; }
+  .review-h { font-size: 22px; font-weight: 400; color: var(--brand); }
+  .review-title { font-size: 14px; font-weight: 500; color: #333; }
+  .review-detail { font-size: 14px; color: #7b7b7b; }
+  .hub-section table th { font-weight: 700; font-size: 14px; color: #333; border-bottom: 1px solid #D9D9D9; background: none; }
+  .hub-section table td { font-size: 14px; border-bottom: 1px solid #D9D9D9; }
+  .hub-section .section-note { font-size: 14px; color: #7b7b7b; font-style: normal; }
+  /* The person's own sources: a second line of plain options under Viewing. */
+  .pick-row.sub { background: none; padding-left: 64px; border-top: 0; }
+  .pick-row.sub button, .pick-row.sub .pick-name { height: auto; font: 400 13px "Roboto", sans-serif; text-transform: none; letter-spacing: 0;
+    color: #7b7b7b; background: none; border: 0; padding: 4px 10px; }
+  .pick-row.sub button.active { color: var(--brand); font-weight: 700; }
+  .pick-row.sub button:disabled { color: #c4c4c4; }
 </style>
 </head>
 <body>
@@ -1122,26 +1175,37 @@
   // Information for the adviser, not decisions.
   const FLAG_WORD = { ACT: "Needs attention", CHECK: "Check", OK: "Fine" };
   const flagPill = (level) => `<span class="flag flag-${level}">${FLAG_WORD[level]}</span>`;
-  function summaryHtml(c) {
-    const every = flagsFor(c), found = every.filter((f) => f.level !== "OK");
+  function summaryHtml(c, person) {
+    // A person's own: the flags about them, or worked out from their own figures (money left over, spending).
+    // Not shown on a person's own: a flag about someone else (another person named, or another's HMRC check).
+    const others = person ? (D.cases.find((d) => d.id === c.id) || { people: [] }).people.map((x) => x.name).filter((n) => n !== person.name) : [];
+    const mine = (f) => {
+      if (!person) return true;
+      const text = `${f.title} ${f.detail || ""}`;
+      if (f.verify && f.verify !== person.key) return false;
+      return text.includes(person.name) || !others.some((n) => text.includes(n));
+    };
+    const every = flagsFor(c).filter(mine), found = every.filter((f) => f.level !== "OK");
     const order = { ACT: 0, CHECK: 1 }, sorted = found.slice().sort((a, b) => order[a.level] - order[b.level]);
     const s = c.factfind.data.summary || {}, g = E.glance(c), left = E.num(s.disposable_monthly);
     const stat = (label, value, note, tone) => `<div class="stat-card ${tone || ""}"><div class="stat-label">${label}</div><div class="stat-value money">${value}</div>${note ? `<div class="stat-note">${note}</div>` : ""}</div>`;
     const link = (f) => f.anchor === "credit" || !f.anchor ? esc(f.title) : `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>`;
-    return `<div class="stat-cards">
+    return `<div data-src="${person ? "person:" + esc(person.key) : "all"}">
+      ${person ? `<h2 class="hub-h">${esc(person.name)}</h2><p class="hub-note">${esc(person.name)}'s own figures: their pay, their own bank accounts and the credit agreements in their name.</p>` : ""}
+      <div class="stat-cards">
         ${stat("Income a month", gbp(s.net_monthly_income), "after tax")}
         ${stat("Outgoings a month", gbp(s.monthly_expenditure), "")}
         ${stat("Left over a month", gbp(s.disposable_monthly), "", left < 0 ? "bad" : "good")}
         ${stat("From the reports", `${g.backed} of ${g.total}`, "figures backed by a source")}
       </div>
       <div class="review">
-        <h3 class="review-h">${sorted.length ? `To review <span class="review-count">${sorted.length}</span>` : "Nothing to review"}</h3>
+        <h3 class="review-h">${sorted.length ? `To review (${sorted.length})` : "Nothing to review"}</h3>
         ${sorted.length ? `<ul class="review-list">${sorted.map((f) => `<li class="review-item ${f.level}">
             <div class="review-top">${flagPill(f.level)}<span class="review-title">${link(f)}</span>${f.verify ? verifyHtml(c, f.verify) : ""}</div>
             ${f.detail ? `<div class="review-detail">${esc(f.detail)}</div>` : ""}${flagNotes(c, f)}</li>`).join("")}</ul>`
-          : `<p class="small muted">Checked: ${esc(every.map((f) => f.title).join("; "))}.</p>`}
+          : `<p class="hub-note">Checked: ${esc(every.map((f) => f.title).join("; "))}.</p>`}
       </div>
-      ${notesPanel(c)}`;
+      ${person ? "" : notesPanel(c)}</div>`;
   }
   // The adviser's notes: against a flag, or on the case. Kept with the case and in the full report.
   function flagNotes(c, f) {
@@ -1720,6 +1784,7 @@
       if (!l.commitment_types.length) prov[`expenditure.${l.key}`] = { origin: "OPEN_BANKING", status: "DERIVED" };
     });
     const income = me.income || {};
+    const spent = Object.values(expenditure).reduce((t, v) => t + E.num(v), 0);
     const out = Object.assign({}, c, {
       person: key, titleOverride: p.name, reference: `${c.reference} ${p.name}`, parties: [p], transactions: mine, months: months,
       accounts: { [key]: c.accounts[key] }, income_detail: (c.income_detail || []).filter((a) => a.who === p.name),
@@ -1727,7 +1792,9 @@
         applicants: data.applicants.map((a, i) => i === idx ? a : Object.assign({}, a, { income: {} })),
         expenditure: expenditure, commitments: commitments,
         summary: Object.assign({}, data.summary, { net_monthly_income: E.num(income.net_monthly).toFixed(2),
-                                                   gross_annual_income: String(E.num(income.total)) }) }) }) });
+                                                   gross_annual_income: String(E.num(income.total)),
+                                                   monthly_expenditure: spent.toFixed(2),
+                                                   disposable_monthly: (E.num(income.net_monthly) - spent).toFixed(2) }) }) }) });
     if (c.me) out.me = { credit: c.me.credit.filter((a) => a.who === p.name), liabilities: c.me.liabilities.map((x) => {
       const items = x.items.filter((it) => it.rows.some((r) => r[0] === "Owner" && String(r[1]).includes(p.name)));
       return Object.assign({}, x, { items: items, answer: items.length ? "Yes" : "No", source: items.length ? x.source : "Credit report" });
@@ -2111,9 +2178,9 @@
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
       ${freshnessHtml(c)}
       <div class="case-bar">${pickerHtml(c)}
-        <nav class="case-tabs">${tabs.map(([key, name, count, tone]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count ${tone || ""}">${count}</span>` : ""}</button>`).join("")}</nav></div>
+        <nav class="case-tabs">${tabs.map(([key, name, count, tone]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count ${tone || ""}">(${count})</span>` : ""}</button>`).join("")}</nav></div>
 
-      ${panel("summary", summaryHtml(c))}
+      ${panel("summary", summaryHtml(c) + budgetPeople(c).map((p) => summaryHtml(personCase(c, p.key), p)).join(""))}
 
       ${panel("budget", quilterHtml(c) + budgetPeople(c).map((p) => quilterHtml(personCase(c, p.key), p)).join(""))}
 
