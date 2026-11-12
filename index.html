@@ -14,9 +14,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="demo-data.js?v=20261112155310"></script>
-<script src="simulated-ai.js?v=20261112155310"></script>
-<script src="engine.js?v=20261112155310"></script>
+<script src="demo-data.js?v=20261112161811"></script>
+<script src="simulated-ai.js?v=20261112161811"></script>
+<script src="engine.js?v=20261112161811"></script>
 <style>
 /* ---- Shared with the HMRC demo (click2checkdev.github.io/HMRC-demo), copied verbatim ---- */
   :root {
@@ -393,7 +393,7 @@
   .status-pill.match, .status-pill.verified { background: rgba(60,184,154,0.14); color: var(--teal-ink); }
   .status-pill.difference, .status-pill.replaced, .status-pill.added, .status-pill.amended,
   .status-pill.missing { background: rgba(224,150,30,0.16); color: #8a5a06; }
-  .status-pill.alert { background: rgba(230,23,88,0.1); color: var(--brand-ink); }
+  .status-pill.alert { background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--brand-ink); }
   .status-pill.prefilled, .status-pill.ai { background: rgba(92,80,190,0.12); color: #4b3fa3; }
   .status-pill.derived, .status-pill.declared { background: #ececef; color: #5f5f66; }
   .finding { border-left: 3px solid var(--border-strong); }
@@ -477,7 +477,7 @@
   .flash { animation: flash 2.8s ease-out; }
   tr.flash { animation: none; } tr.flash > td { animation: flashrow 2.8s ease-out; }
   /* The Quilter budget planner form: what is still to come (planner/form.html) */
-  .to-come { border: 1px solid rgba(230,23,88,0.35); background: rgba(230,23,88,0.05); border-radius: 8px; padding: 12px 16px; margin: 0 0 14px; }
+  .to-come { border: 1px solid color-mix(in srgb, var(--brand) 35%, transparent); background: color-mix(in srgb, var(--brand) 5%, transparent); border-radius: 8px; padding: 12px 16px; margin: 0 0 14px; }
   .to-come ul { margin: 6px 0 0; padding-left: 18px; }
   .all-in { border: 1px solid rgba(60,184,154,0.45); background: rgba(60,184,154,0.08); border-radius: 8px; padding: 10px 16px; margin: 0 0 14px; }
   .waiting-note { display: block; font-size: 12px; color: var(--brand); }
@@ -538,7 +538,7 @@
   .statement-filters button { width: auto; padding: 7px 14px; font-size: 13px; }
   .flag { display: inline-flex; justify-content: center; min-width: 46px; padding: 2px 8px; border-radius: 999px;
           font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; flex-shrink: 0; }
-  .flag-ACT { background: rgba(230,23,88,0.12); color: var(--brand-ink); }
+  .flag-ACT { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand-ink); }
   .flag-CHECK { background: rgba(224,150,30,0.16); color: #8a5a06; }
   .flag-OK { background: rgba(60,184,154,0.14); color: var(--teal-ink); }
   .summary-panel { border-left: 3px solid var(--teal); margin: 0 0 12px; }
@@ -612,51 +612,123 @@
     main { padding: 24px 12px; }
     .card, .card.wide { padding: 24px 18px; }
   }
+/* ---- The hub's look (c2c-hub-frontend/mdn_credit), 12 Nov 2026 ----
+   Roboto, the grey page, white panels with the hub's thin shadow and 3px corners, 22px headings in the
+   brand colour, the coloured tab bar. --brand is the firm's own colour in the hub (clientSetupData hex):
+   white-labelled firms get theirs. */
+  :root { --hub-grey: #f3f4f6; --hub-text: #595959; --hub-tab-ink: #656b79;
+          --font-display: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          --font-body: var(--font-display); --font-mono: var(--font-display);
+          --brand-ink: color-mix(in srgb, var(--brand) 78%, black); }
+  body { background: var(--hub-grey); background-image: none; font-family: var(--font-body); }
+  .hub-navbar { height: 73px; box-shadow: 1px 1px 1px #d9dbe0; border-bottom: 0; }
+  .hub-navbar .header-logo { width: 290px; padding: 0 35px; }
+  .hub-navbar .logo-img { height: 40px; width: 144px; }
+  .hub-navbar .welcome { margin-left: auto; font-size: 12px; color: #888888; padding-right: 34px; }
+  .hub-sidebar { width: 290px; background: var(--hub-grey); border-right: 0; padding: 20px 16px; }
+  .hub-sidebar .sidebar-nav { padding: 0; gap: 0; }
+  .hub-item, .hub-sidebar .sidebar-link { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0;
+    border-bottom: 1px solid var(--hub-text); border-radius: 0; padding: 11px 20px; font: 14px var(--font-body); color: var(--hub-text); cursor: default; }
+  .hub-item.child { border-bottom: 0; padding: 5px 10px; }
+  .hub-item.child.open { color: var(--brand); }
+  .hub-item.leaf, .hub-sidebar .hub-leaf { border-bottom: 0; padding: 5px 10px; font-size: 14px; }
+  .hub-sub { margin-left: 16px; padding-top: 6px; }
+  .hub-sidebar .sidebar-link { cursor: pointer; }
+  .hub-sidebar .hub-leaf.active { color: var(--brand); font-weight: 700; background: none; }
+  .hub-sidebar .hub-new { margin-top: 10px; }
+  .hub-sidebar .sidebar-link:hover, .hub-sidebar .hub-new.active { background: var(--brand); color: #fff; border-radius: 8px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--hub-text); display: inline-block; }
+  .new-tag { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px;
+    background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); }
+  .hub-sidebar .hub-new:hover .new-tag, .hub-sidebar .hub-new.active .new-tag { background: #fff; }
+  main { padding: 20px 1.5%; }
+  .card.wide, #case-view.card, #cases-view { max-width: none; width: 100%; background: transparent; border: 0; box-shadow: none; padding: 0; }
+  #templates-view.card, #how-view.card { background: #fff; border: 0; border-radius: 3px; box-shadow: 0 1px 2px 1px #dddbdb; padding: 20px; }
+  #templates-view h1.title, #how-view h1.title { font-size: 22px; font-weight: 400; color: var(--brand); }
+  .hub-crumbs { display: flex; flex-wrap: wrap; align-items: center; font-size: 14px; color: #7b7b7b; margin: 0 0 20px; }
+  .hub-crumbs a { color: var(--brand); text-decoration: none; }
+  .hub-crumbs .sep { margin: 0 5px; }
+  .hub-panel { background: #fff; padding: 15px; margin-bottom: 20px; border-radius: 3px; box-shadow: 0 1px 2px 1px #dddbdb; }
+  .hub-h { font-size: 22px; font-weight: 400; line-height: 1.1; color: var(--brand); margin: 0 0 15px; }
+  .hub-tabbar { display: flex; flex-wrap: wrap; height: auto; min-height: 40px; background: var(--brand); border: 1px solid var(--brand); border-radius: 3px 3px 0 0; overflow: hidden; }
+  .hub-tabbar button { border: 0; background: transparent; color: rgba(255,255,255,.75); font: 500 14px var(--font-body); padding: 0 15px; min-height: 38px; border-radius: 3px; cursor: pointer; }
+  .hub-tabbar button:hover { color: #fff; }
+  .hub-tabbar button.active { background: #fff; color: var(--hub-tab-ink); }
+  .hub-tabbar .new-tag { background: rgba(255,255,255,.25); color: #fff; }
+  .hub-tabbar button.active .new-tag { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); }
+  .hub-body { background: #fff; padding: 30px 15px 15px; margin-bottom: 60px; }
+  .hub-cards { display: flex; flex-wrap: wrap; gap: 16px; }
+  .hub-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 225px; min-height: 200px;
+    border: 1px solid #d4d4d4; border-radius: 10px; background: #eee; padding: 20px; color: var(--brand); font-size: 14px; text-align: center; }
+  .hub-card-img { width: 110px; height: 90px; border-radius: 8px; background: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--brand); }
+  .hub-card-img.pdf { color: #c0392b; }
+  .hub-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px 20px; }
+  .hub-fields label { display: block; font-size: 13px; color: var(--hub-text); margin-bottom: 4px; }
+  .hub-input { border: 1px solid #d4d4d4; border-radius: 3px; padding: 8px 10px; min-height: 36px; font-size: 14px; color: #333; background: #fafafa; }
+  .hub-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .hub-table th { text-align: left; background: #f9fafb; color: var(--hub-text); font-weight: 500; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+  .hub-table td { padding: 12px 10px; border-bottom: 1px solid #f0f0f2; }
+  .hub-table tbody tr { cursor: pointer; }
+  .hub-table tbody tr:hover { background: #fafafa; }
+  .hub-table a { color: var(--brand); text-decoration: none; }
+  /* Affordability's own headings sit in the hub's style. */
+  .hub-section .section h2 { font-size: 22px; font-weight: 400; color: var(--brand); border-bottom: 0; }
+  .hub-section .case-tabs button.active { border-bottom-color: var(--brand); }
+  @media (max-width: 820px) {
+    .hub-navbar .header-logo { width: auto; padding: 0 16px; }
+    .hub-sidebar { display: none; }
+    .hub-tabbar button { flex: 1 1 auto; }
+  }
 </style>
 </head>
 <body>
 
-<div class="app-header">
+<div class="app-header hub-navbar">
   <div class="header-logo">
-    <img src="logo.png" alt="Click2Check" class="logo-img" width="120" height="30" onerror="this.style.display='none'" />
+    <img src="logo.png" alt="Click2Check" class="logo-img" width="144" height="40" onerror="this.style.display='none'" />
   </div>
-  <h1 id="page-title">Cases</h1>
+  <h1 id="page-title" hidden></h1>
   <select id="mobile-nav" aria-label="Go to">
-    <option value="case">C2C Extract AI</option>
-    <option value="templates">Templates</option><option value="how">How it works</option>
+    <option value="cases">My Cases</option>
+    <option value="case">Case</option>
+    <option value="templates">Affordability forms</option>
   </select>
   <div class="welcome">
     <span id="welcome-name">Welcome</span>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1.5-4 5-6 7.5-6s6 2 7.5 6"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
   </div>
 </div>
 
 <div class="body-row">
 
-<div class="sidebar">
+<div class="sidebar hub-sidebar">
   <nav class="sidebar-nav">
-    <button class="sidebar-link active" data-view="case">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
-      C2C Extract AI
-    </button>
-    <button class="sidebar-link" data-view="templates">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>
-      Templates
-    </button>
-    <button class="sidebar-link" data-view="how">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
-      How it works
-    </button>
+    <div class="hub-item" title="Part of the hub">Home</div>
+    <div class="hub-item" title="Part of the hub">My Profile</div>
+    <div class="hub-item" title="Part of the hub">Financial Controls</div>
+    <div class="hub-item open">User Controls</div>
+    <div class="hub-sub">
+      <div class="hub-item child" title="Part of the hub">Adviser Request</div>
+      <div class="hub-item child open">My Cases</div>
+      <div class="hub-sub">
+        <button class="sidebar-link hub-leaf active" data-view="cases"><span class="dot"></span>My Cases</button>
+        <div class="hub-item leaf" title="Part of the hub"><span class="dot"></span>My Cases Transferred</div>
+      </div>
+    </div>
+    <button class="sidebar-link hub-new" data-view="templates">Affordability forms <span class="new-tag">New</span></button>
   </nav>
   <div class="sidebar-foot">
-    <label class="note example-pick">Example case<select id="example-case"></select></label>
-    <p class="note">In the Hub, an adviser opens a case and clicks C2C Extract AI: the demo starts there. Pick another example case above. Decisions you make are kept in this browser until you reset.</p>
+    <select id="example-case" hidden></select>
+    <p class="note">Demo: the hub's own menu. <strong>New</strong> marks what Affordability adds. Decisions are kept in this browser until you reset.</p>
     <button class="btn-secondary" id="reset-btn">Reset demo</button>
   </div>
 </div>
 
 <div class="content-area">
 <main>
+
+  <!-- MY CASES (the hub's list) -->
+  <div id="cases-view" class="hidden"></div>
 
   <!-- CASE DETAIL -->
   <div id="case-view" class="card wide hidden"></div>
@@ -789,31 +861,51 @@
 
   // ---- navigation -----------------------------------------------------------------------
   let currentCase = null, banner = "";
-  const VIEWS = ["case", "statement", "credit", "templates", "how"];
+  const VIEWS = ["cases", "case", "statement", "credit", "templates", "how"];
   // The product's name, with what it is, on the case's pages.
   const PRODUCT = `C2C Extract AI <span class="page-sub">The affordability solution</span>`;
-  const TITLES = { case: PRODUCT, statement: PRODUCT, credit: PRODUCT,
+  const TITLES = { cases: "My Cases", case: PRODUCT, statement: PRODUCT, credit: PRODUCT,
                    templates: "Templates", how: "How it works" };
   function showView(view) {
     VIEWS.forEach((v) => $(v + "-view").classList.toggle("hidden", v !== view));
     document.querySelectorAll(".sidebar-link").forEach((b) =>
-      b.classList.toggle("active", b.dataset.view === view || (["statement", "credit"].includes(view) && b.dataset.view === "case")));
+      b.classList.toggle("active", b.dataset.view === view || (["case", "statement", "credit"].includes(view) && b.dataset.view === "cases")));
     $("page-title").innerHTML = TITLES[view];
     $("mobile-nav").value = ["statement", "credit"].includes(view) ? "case" : view;
+    document.querySelectorAll(".hub-new").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
     if (view === "templates") renderTemplates();
+    if (view === "cases") renderCases();
     window.scrollTo(0, 0);
   }
   // Affordability is the case's page; the other views are beside it.
   const go = (view) => (view === "case" ? openCase(currentCase || state.cases[0]) : showView(view));
+  // Which of the hub's case tabs is open: Documents, Case Details, or the new Affordability.
+  let hubTab = "affordability";
   document.querySelectorAll(".sidebar-link").forEach((b) => b.addEventListener("click", () => go(b.dataset.view)));
   $("mobile-nav").addEventListener("change", (e) => go(e.target.value));
   $("reset-btn").addEventListener("click", () => { state = fresh(); save(); currentCase = null; openCase(state.cases[0]); });
   // The example cases, for showing more than one in a demo.
   $("example-case").addEventListener("change", (e) => openCase(state.cases[+e.target.value]));
 
+
+  // The hub's My Cases list (pages/Dashboard/MyCases): a case opens on its page.
+  function crumbs(parts) {
+    return `<div class="hub-crumbs">${parts.map(([text, view]) => view ? `<a href="#" data-crumb="${view}">${esc(text)}</a>` : `<span>${esc(text)}</span>`).join('<span class="sep">/</span>')}</div>`;
+  }
+  function renderCases() {
+    $("cases-view").innerHTML = crumbs([["Home"], ["User Controls"], ["My Cases"], ["My Cases"]]) + `
+      <div class="hub-panel"><table class="hub-table"><thead><tr><th>Name</th><th>Email</th><th>Type</th><th>Affordability</th><th>Date Issued</th></tr></thead><tbody>
+      ${state.cases.map((x, i) => { const a = x.factfind.data.applicants || [];
+        return `<tr data-open-case="${i}"><td><a href="#">${esc(caseTitle(x))}</a></td><td>${esc((a[0] || {}).email || "")}</td><td>${esc(label(x.type))}</td>
+          <td>${statusPill(x)}</td><td>${esc(dateLong(x.opened))}</td></tr>`; }).join("")}</tbody></table>
+      <p class="small muted" style="margin:10px 0 0">The hub's own list. <strong>Affordability</strong> is the one new column.</p></div>`;
+    document.querySelectorAll("[data-open-case]").forEach((r) => r.addEventListener("click", (e) => { e.preventDefault(); openCase(state.cases[+r.dataset.openCase]); }));
+    document.querySelectorAll("[data-crumb]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); go(a.dataset.crumb); }));
+  }
+
   // ---- case detail ------------------------------------------------------------------------
   function openCase(c) {
-    if (currentCase !== c) { pick = "all"; caseTab = "summary"; }
+    if (currentCase !== c) { pick = "all"; caseTab = "summary"; hubTab = "affordability"; }
     currentCase = c;
     $("example-case").innerHTML = state.cases.map((x, i) => `<option value="${i}"${x === c ? " selected" : ""}>${esc(caseTitle(x))}${x.status === "COLLECTING" ? " (checks still to come)" : ""}</option>`).join("");
     showView("case"); renderCase();
@@ -936,6 +1028,8 @@
       } else { said[f.path] = gbp(f.declared); takenId[f.path] = f.id; }
     });
     const sections = {}; D.sections.forEach((s) => { sections[s] = []; });
+    // Kept in the hub's Case Details, so not repeated here.
+    const PERSONAL = /^applicants\[n\]\.(role|title|first_name|last_name|full_name|date_of_birth|address|postcode|email|phone)$/;
     const row = (label, path, kind) => {
       let value = E.getPath(data, path, "");
       if (value === null || value === undefined) value = "";
@@ -948,7 +1042,7 @@
     };
     data.applicants.forEach((a, i) => {
       const who = a.full_name || `Applicant ${i + 1}`;
-      D.fields.filter((f) => f.path.startsWith("applicants[n]")).forEach((f) =>
+      D.fields.filter((f) => f.path.startsWith("applicants[n]") && !PERSONAL.test(f.path)).forEach((f) =>
         sections[f.section].push(row(`${who}: ${f.label}`, f.path.replace("[n]", `[${i}]`), f.kind)));
     });
     data.commitments.forEach((r, j) => {
@@ -956,7 +1050,7 @@
       const kind = String(r.type || "").replace(/_/g, " ").toLowerCase();
       sections.Commitments.push(row(`${r.lender} (${kind}, ${r.owner_name || r.owner})`, `commitments[${j}].monthly_payment`, "money"));
     });
-    D.fields.filter((f) => !/^(applicants|commitments)\[/.test(f.path)).forEach((f) => {
+    D.fields.filter((f) => !/^(applicants|commitments)\[/.test(f.path) && f.section !== "Case").forEach((f) => {
       if (f.section === "Company" && !data.company) return;
       sections[f.section].push(row(f.label, f.path, f.kind));
     });
@@ -1057,7 +1151,7 @@
     if (placed.length) {
       const names = [...new Set(placed.map((t) => t.description))].sort();
       flag("CHECK", `${placed.length} transaction${placed.length > 1 ? "s" : ""} placed by AI`,
-           `Merchants the rules didn't know: ${names.slice(0, 6).join(", ")}${names.length > 6 ? "…" : ""}. Each says why on the Open Banking statement; change any that are wrong.`, "transactions");
+           `Merchants the rules didn't know: ${names.slice(0, 6).join(", ")}${names.length > 6 ? "…" : ""}. Each says why under Bank transactions; change any that are wrong.`, "transactions");
     }
     (ins.freshness || []).filter((f) => f.stale).forEach((f) => flag("CHECK", `${f.source} for ${f.who} is ${f.days} days old`,
       `Dated ${f.date}; a newer one would show the latest.`, "sources"));
@@ -1074,7 +1168,7 @@
       <span class="small muted">${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month · ${E.glance(c).backed} of ${E.glance(c).total} figures from the reports</span>
       ${found.length ? "" : `<p style="margin:10px 0 0">${flagPill("OK").replace(">OK<", ">Nothing to note<")}
         <span class="small muted">Checked: ${esc(every.map((f) => f.title).join("; "))}.</span></p>`}
-      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#credit" data-open-credit data-credit-query="${esc(f.query)}">${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}${flagNotes(c, f)}</span></li>`).join("")}</ul></div>
+      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? `<a href="#" data-hub-goto="documents">${esc(f.title)}</a>` : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}${flagNotes(c, f)}</span></li>`).join("")}</ul></div>
       ${notesPanel(c)}`;
   }
   // The adviser's notes: against a flag, or on the case. Kept with the case and in the full report.
@@ -2027,7 +2121,7 @@
     const tabs = [["summary", dot + (act ? "Worth a look" : check ? "For information" : "Nothing to note"), act + check],
                   ["budget", "Budget planner"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
                   ["bank", "Bank transactions", Object.keys(waiting).length],
-                  ["sources", "Sources"], ["outputs", "Outputs and audit"]];
+                  ["outputs", "Outputs and audit"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
     const panel = (key, html) => `<section class="tab-panel" data-tab="${key}"${key === caseTab ? "" : " hidden"}>${html}</section>`;
     const audit = ff.audit.slice().reverse().map((e) => `
@@ -2037,19 +2131,31 @@
     const outputs = (c.outputs || []).map((o, i) => `<tr><td><button class="link-button" data-output="${i}">${esc(o.filename)}</button></td>
       <td class="small muted">${esc(o.by)} · ${esc(shortTime(o.at))}</td></tr>`).join("");
 
+    const people = (ff.data.applicants || []);
+    const hubTabs = [["documents", "Documents"], ["details", "Case Details"], ["affordability", "Affordability"]];
     $("case-view").innerHTML = `
+      ${crumbs([["Home", "cases"], ["User Controls"], ["My Cases"], ["My Cases", "cases"], ["Credit request and referral"]])}
+      <div class="hub-tabbar">${hubTabs.map(([k, n]) => `<button data-hub-tab="${k}" class="${k === hubTab ? "active" : ""}">${n}${k === "affordability" ? ' <span class="new-tag">New</span>' : ""}</button>`).join("")}</div>
+      <div class="hub-body">
+      <section class="hub-section" data-hub="documents"${hubTab === "documents" ? "" : " hidden"}>
+        <div class="hub-panel"><h2 class="hub-h">${esc(caseTitle(c))} - Online Content</h2>
+          <div class="hub-cards">${c.parties.filter((pp) => pp.sources.includes("CREDIT")).map((pp) => `<div class="hub-card"><div class="hub-card-img">C2C</div><strong>Online Credit Summary</strong><span class="small muted">${esc(pp.name)}</span></div>`).join("")}</div></div>
+        <div class="hub-panel"><h2 class="hub-h">${esc(caseTitle(c))} - Documents</h2>
+          <div class="hub-cards">${c.parties.map((pp) => pp.sources.map((src) => `<div class="hub-card"><div class="hub-card-img pdf">PDF</div><span>${esc(pp.name)}</span><strong>${src === "CREDIT" ? "Credit Report.pdf" : "Bank Report.pdf"}</strong></div>`).join("")).join("")}</div>
+          <p class="small muted" style="margin:12px 0 0">The hub's own Documents tab, unchanged: the credit report, its online summary and the bank report are already here, so Affordability doesn't repeat them.</p></div>
+      </section>
+      <section class="hub-section" data-hub="details"${hubTab === "details" ? "" : " hidden"}>
+        ${people.map((a) => `<div class="hub-panel"><h2 class="hub-h">${esc(a.full_name || "")}</h2>
+          <div class="hub-fields">${[["Title", a.title], ["First Name", a.first_name], ["Surname", a.last_name], ["Date Of Birth", a.date_of_birth],
+            ["Email Address", a.email], ["Mobile Number", a.phone], ["Current Address", a.address], ["Postcode", a.postcode]]
+            .map(([l, v]) => `<div><label>${l}</label><div class="hub-input">${esc(v || "")}</div></div>`).join("")}</div></div>`).join("")}
+        <p class="small muted">The hub's own Case Details tab, unchanged: Affordability reads the applicants from here.</p>
+      </section>
+      <section class="hub-section" data-hub="affordability"${hubTab === "affordability" ? "" : " hidden"}>
       ${banner ? `<div class="banner">${esc(banner)}</div>` : ""}
-      <div class="detail-head"><div>
-        <div class="eyebrow muted">${esc(c.reference)}</div>
-        <h1 class="title">${esc(caseTitle(c))}</h1></div></div>
       <p class="case-meta"><span class="cat-pill ${c.type.toLowerCase()}">${esc(c.type)}</span> ${statusPill(c)}
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
       ${freshnessHtml(c)}
-      <div class="case-actions">
-        <button class="btn-secondary" data-open-statement>Open Banking statement</button>
-        <button class="btn-secondary" data-open-credit>Credit report</button>
-        <button class="btn-secondary" id="dl-report">Full report (PDF)</button>
-      </div>
       <div class="case-bar">${pickerHtml(c)}
         <nav class="case-tabs">${tabs.map(([key, name, count]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count">${count}</span>` : ""}</button>`).join("")}</nav></div>
 
@@ -2070,18 +2176,18 @@
 
       <section class="tab-panel" data-tab="bank"${caseTab === "bank" ? "" : " hidden"}>
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2 id="transactions">Bank transactions${toCategorise ? `<span class="count">${plural(Object.keys(waiting).length, "merchant")} to categorise</span>` : ""}</h2>
-        <p class="section-note">Each transaction is placed by a rule, AccountScore's own category or merchant memory; AI places only what none of those know, with a reason; a broker decides the rest. Each says which. Every transaction, with its balance, category and filters, is on the Open Banking statement, above.</p>
+        <p class="section-note">Each transaction is placed by a rule, AccountScore's own category or merchant memory; AI places only what none of those know, with a reason; a broker decides the rest. Each says which. The bank report itself is on the hub's Documents tab.</p>
         ${toCategorise || '<div class="panel small">Every transaction is categorised.</div>'}</div>` : ""}
       ${c.transactions.length ? `<div class="section" data-src="${esc(bankSrc)}"><h2>How the accounts were put together<span class="count">one per person or company</span></h2>
         <p class="section-note">Every bank the customer connected, merged into one picture: duplicates dropped, transfers between their own accounts paired.</p>
         ${bankingHtml(c)}</div>` : ""}
       </section>
 
-      ${panel("sources", `<div class="section" data-src="all"><h2 id="sources">Sources</h2>${sources}</div>`)}
 
       <section class="tab-panel" data-tab="outputs"${caseTab === "outputs" ? "" : " hidden"}>
       <div class="section" data-src="all"><h2>Outputs</h2>
-        <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.</p>
+        <div class="panel"><p>The C2C Mortgage Expenditure Form, or a firm template once its mapping is saved, filled from this fact find.
+          <button class="btn-secondary" id="dl-report" style="float:right">Full report (PDF)</button></p>
           <div class="inline-form"><select id="out-template"><option value="standard">C2C expenditure form (standard)</option><option value="me">Mortgage Experience fact find (PDF)</option>
             <option value="xlsx:categories">Budget planner, CRM categories (Excel)</option><option value="xlsx:c2c">C2C budget planner (Excel)</option>
             ${D.templates.map((t) => { const ready = state.templates[t.id] && state.templates[t.id].saved;
@@ -2095,10 +2201,18 @@
                 : '<p class="small">No changes yet. Accepting a figure or categorising a transaction records it here.</p>'}
       </div>
       </section>
+      </section>
+      </div>
       <p class="disclaimer">This is a DEMO built from fictional sample reports. It is not a real affordability assessment.</p>`;
     banner = "";
 
     const filterRows = () => {};
+    document.querySelectorAll("#case-view [data-hub-tab]").forEach((b) => b.addEventListener("click", () => {
+      hubTab = b.dataset.hubTab;
+      document.querySelectorAll("#case-view [data-hub-tab]").forEach((x) => x.classList.toggle("active", x === b));
+      document.querySelectorAll("#case-view [data-hub]").forEach((x) => { x.hidden = x.dataset.hub !== hubTab; });
+    }));
+    document.querySelectorAll("#case-view [data-crumb]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); go(a.dataset.crumb); }));
     const showTab = (key) => {
       caseTab = key;
       document.querySelectorAll("#case-view .tab-panel").forEach((p) => { p.hidden = p.dataset.tab !== key; });
@@ -2117,8 +2231,8 @@
       // Once the source picker shows everything (a flag resets it), light up what the flag is about.
       setTimeout(() => { if (!highlight(targets, where)) target.scrollIntoView(); }, 0);
     }));
-    document.querySelectorAll("[data-open-statement]").forEach((b) => b.addEventListener("click", openStatement));
-    document.querySelectorAll("[data-open-credit]").forEach((b) => b.addEventListener("click", openCredit));
+    document.querySelectorAll("[data-hub-goto]").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault(); document.querySelector(`#case-view [data-hub-tab="${a.dataset.hubGoto}"]`).click(); window.scrollTo(0, 0); }));
     document.querySelectorAll("#case-view [data-budget]").forEach((b) => b.addEventListener("click", () => {
       budgetLayout = b.dataset.budget;
       document.querySelectorAll("#case-view [data-budget]").forEach((x) => x.classList.toggle("active", x === b));
