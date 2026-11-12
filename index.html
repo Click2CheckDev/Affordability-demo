@@ -14,9 +14,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-<script src="demo-data.js?v=20261112164319"></script>
-<script src="simulated-ai.js?v=20261112164319"></script>
-<script src="engine.js?v=20261112164319"></script>
+<script src="demo-data.js?v=20261112170332"></script>
+<script src="simulated-ai.js?v=20261112170332"></script>
+<script src="engine.js?v=20261112170332"></script>
 <style>
 /* ---- Shared with the HMRC demo (click2checkdev.github.io/HMRC-demo), copied verbatim ---- */
   :root {
@@ -643,6 +643,54 @@
   .demo-bar .sidebar-link, .demo-bar .sidebar-link.active, .demo-bar .sidebar-link:hover { background: none; border: 0; width: auto; padding: 4px 6px; gap: 0; font-size: 13px; box-shadow: none; }
   .demo-bar .sidebar-link.active { color: var(--brand); }
   #case-view .hub-body { margin-top: 0; border-radius: 3px; box-shadow: 0 1px 2px 1px #dddbdb; }
+
+  /* ---- Design pass, 12 Nov 2026 ---- */
+  /* Pills in sentence case, not capitals. */
+  .status-pill, .cat-pill, .flag { display: inline-block; font-family: var(--font-body); font-size: 12px; font-weight: 500; letter-spacing: 0;
+    text-transform: lowercase; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .status-pill::first-letter, .cat-pill::first-letter, .flag::first-letter { text-transform: uppercase; }
+  .case-meta { gap: 10px; margin: 0 0 4px; }
+  .freshness { margin: 0 0 14px; color: var(--muted); }
+  /* Viewing: who and which source. */
+  .pick-row { border-bottom: 0; gap: 6px; padding: 4px 0; }
+  .pick-label { font-size: 12px; color: var(--muted); margin-right: 6px; text-transform: none; letter-spacing: 0; font-family: var(--font-body); }
+  .pick-row button { border: 1px solid #e3e3e6; border-radius: 999px; padding: 4px 12px; height: auto; font-size: 13px; background: #fff; color: #444; }
+  .pick-row button.active { background: color-mix(in srgb, var(--brand) 10%, #fff); border-color: var(--brand); color: var(--brand); font-weight: 500; }
+  /* Tabs: plain names, clear active state, counts that say what needs doing. */
+  .case-bar { border-bottom: 1px solid #e5e5e8; margin: 6px 0 20px; padding-top: 6px; }
+  .case-tabs { gap: 4px; }
+  .case-tabs button { height: 42px; padding: 0 14px; font-size: 14px; color: #6b6b72; border-bottom-width: 3px; }
+  .case-tabs button.active { color: var(--ink); font-weight: 500; }
+  .case-tabs .count { background: #ececef; color: #555; font-size: 11px; font-weight: 600; margin-left: 4px; }
+  .case-tabs .count.act { background: var(--brand); color: #fff; }
+  /* Summary: headline figures, then what to review. */
+  .stat-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 20px; }
+  .stat-card { border: 1px solid #e8e8eb; border-radius: 6px; padding: 14px 16px; background: #fff; }
+  .stat-card .stat-label { font-size: 12.5px; color: var(--muted); }
+  .stat-card .stat-value { font-size: 24px; font-weight: 500; color: var(--ink); margin-top: 4px; }
+  .stat-card .stat-note { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .stat-card.good .stat-value { color: var(--teal-ink); }
+  .stat-card.bad .stat-value { color: var(--brand); }
+  .review-h { font-size: 16px; font-weight: 500; color: var(--ink); margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .review-count { font-size: 12px; background: #ececef; border-radius: 999px; padding: 1px 8px; font-weight: 600; }
+  .review-list { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 8px; }
+  .review-item { border: 1px solid #e8e8eb; border-left: 4px solid #e0961e; border-radius: 6px; padding: 12px 14px; background: #fff; }
+  .review-item.ACT { border-left-color: var(--brand); }
+  .review-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .review-title { font-size: 14.5px; color: var(--ink); font-weight: 500; flex: 1; min-width: 200px; }
+  .review-title a { color: inherit; text-decoration: none; }
+  .review-title a:hover { color: var(--brand); text-decoration: underline; }
+  .review-detail { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+  .review-item .flag-add { margin-top: 6px; }
+  .flag-ACT { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand-ink); }
+  .flag-CHECK { background: rgba(224,150,30,0.16); color: #8a5a06; }
+  .demo-bar #mobile-nav { display: none !important; }
+  @media (max-width: 820px) {
+    .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .case-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .case-tabs button { flex: none; padding: 0 12px; }
+    .demo-what { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -1072,17 +1120,27 @@
     return out.sort((a, b) => FLAG_ORDER[a.level] - FLAG_ORDER[b.level]);
   }
   // Information for the adviser, not decisions.
-  const FLAG_WORD = { ACT: "Worth a look", CHECK: "For information", OK: "OK" };
+  const FLAG_WORD = { ACT: "Needs attention", CHECK: "Check", OK: "Fine" };
   const flagPill = (level) => `<span class="flag flag-${level}">${FLAG_WORD[level]}</span>`;
   function summaryHtml(c) {
-    // What is worth a look or worth knowing; what was checked and is fine is one line, only when nothing else is.
-    const every = flagsFor(c), found = every.filter((f) => f.level !== "OK"), act = found.some((f) => f.level === "ACT"), check = found.some((f) => f.level === "CHECK");
-    const s = c.factfind.data.summary || {}, people = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name);
-    return `<div class="panel summary-panel ${act ? "act" : check ? "check" : "ok"}">
-      <span class="small muted">${people.length > 1 ? esc(people.join(" & ")) + " · " : ""}income ${gbp(s.net_monthly_income)} · outgoings ${gbp(s.monthly_expenditure)} · left over <strong>${gbp(s.disposable_monthly)}</strong> a month · ${E.glance(c).backed} of ${E.glance(c).total} figures from the reports</span>
-      ${found.length ? "" : `<p style="margin:10px 0 0">${flagPill("OK").replace(">OK<", ">Nothing to note<")}
-        <span class="small muted">Checked: ${esc(every.map((f) => f.title).join("; "))}.</span></p>`}
-      <ul class="flags">${found.map((f) => `<li>${flagPill(f.level)}<span>${f.anchor === "credit" ? esc(f.title) : f.anchor ? `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>` : esc(f.title)}${f.verify ? " " + verifyHtml(c, f.verify) : ""}${f.detail ? `<br><span class="small muted">${esc(f.detail)}</span>` : ""}${flagNotes(c, f)}</span></li>`).join("")}</ul></div>
+    const every = flagsFor(c), found = every.filter((f) => f.level !== "OK");
+    const order = { ACT: 0, CHECK: 1 }, sorted = found.slice().sort((a, b) => order[a.level] - order[b.level]);
+    const s = c.factfind.data.summary || {}, g = E.glance(c), left = E.num(s.disposable_monthly);
+    const stat = (label, value, note, tone) => `<div class="stat-card ${tone || ""}"><div class="stat-label">${label}</div><div class="stat-value money">${value}</div>${note ? `<div class="stat-note">${note}</div>` : ""}</div>`;
+    const link = (f) => f.anchor === "credit" || !f.anchor ? esc(f.title) : `<a href="#${f.anchor}" data-flag-link data-targets="${esc(f.targets.join(" "))}">${esc(f.title)}</a>`;
+    return `<div class="stat-cards">
+        ${stat("Income a month", gbp(s.net_monthly_income), "after tax")}
+        ${stat("Outgoings a month", gbp(s.monthly_expenditure), "")}
+        ${stat("Left over a month", gbp(s.disposable_monthly), "", left < 0 ? "bad" : "good")}
+        ${stat("From the reports", `${g.backed} of ${g.total}`, "figures backed by a source")}
+      </div>
+      <div class="review">
+        <h3 class="review-h">${sorted.length ? `To review <span class="review-count">${sorted.length}</span>` : "Nothing to review"}</h3>
+        ${sorted.length ? `<ul class="review-list">${sorted.map((f) => `<li class="review-item ${f.level}">
+            <div class="review-top">${flagPill(f.level)}<span class="review-title">${link(f)}</span>${f.verify ? verifyHtml(c, f.verify) : ""}</div>
+            ${f.detail ? `<div class="review-detail">${esc(f.detail)}</div>` : ""}${flagNotes(c, f)}</li>`).join("")}</ul>`
+          : `<p class="small muted">Checked: ${esc(every.map((f) => f.title).join("; "))}.</p>`}
+      </div>
       ${notesPanel(c)}`;
   }
   // The adviser's notes: against a flag, or on the case. Kept with the case and in the full report.
@@ -1122,7 +1180,7 @@
     if (top.length + rows.reduce((n, r) => n + r[2].length, 0) < 2) return "";
     const button = (v, n, m, owner) => `<button data-pick="${esc(v)}" data-match="${esc(m)}" data-owner="${esc(owner)}">${esc(n)}</button>`;
     return `<div class="source-picker" data-only="${c.parties.length === 1 ? esc(c.parties[0].key) : ""}">
-      <div class="pick-row"><span class="pick-label">Show</span>${top.map(([v, n, m, o]) => button(v, n, m, o)).join("")}</div>
+      <div class="pick-row"><span class="pick-label">Viewing</span>${top.map(([v, n, m, o]) => button(v, n, m, o)).join("")}</div>
       ${rows.map(([key, name, own, value, match]) => `<div class="pick-row sub" data-sub-of="${esc(key)}" hidden><button class="pick-name" data-pick="${esc(value)}" data-match="${esc(match)}" data-owner="${esc(key)}" title="Everything for ${esc(name)}">${esc(name)}</button>${own.map(([v, n, m]) => button(v, n, m, key)).join("")}</div>`).join("")}</div>`;
   }
   // A source the open tab shows nothing for (an account on the budget
@@ -2032,10 +2090,10 @@
     // Tabs: one part of the case at a time (as the service's case page).
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
-    const tabs = [["summary", dot + (act ? "Worth a look" : check ? "For information" : "Nothing to note"), act + check],
-                  ["budget", "Budget planner"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
-                  ["bank", "Bank transactions", Object.keys(waiting).length],
-                  ["outputs", "Outputs and audit"]];
+    const tabs = [["summary", "Summary", act + check, act ? "act" : ""],
+                  ["budget", "Budget planner"], ["income", "Income & spending"], ["taken", "Fact find", blocking(c), "act"],
+                  ["bank", "Transactions", Object.keys(waiting).length],
+                  ["outputs", "Outputs"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
     const panel = (key, html) => `<section class="tab-panel" data-tab="${key}"${key === caseTab ? "" : " hidden"}>${html}</section>`;
     const audit = ff.audit.slice().reverse().map((e) => `
@@ -2053,7 +2111,7 @@
         <span class="small muted">Adviser ${esc(c.adviser)} · opened ${esc(dateLong(c.opened))}</span></p>
       ${freshnessHtml(c)}
       <div class="case-bar">${pickerHtml(c)}
-        <nav class="case-tabs">${tabs.map(([key, name, count]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count">${count}</span>` : ""}</button>`).join("")}</nav></div>
+        <nav class="case-tabs">${tabs.map(([key, name, count, tone]) => `<button data-tab-button="${key}" class="${key === caseTab ? "active" : ""}">${name}${count ? ` <span class="count ${tone || ""}">${count}</span>` : ""}</button>`).join("")}</nav></div>
 
       ${panel("summary", summaryHtml(c))}
 
