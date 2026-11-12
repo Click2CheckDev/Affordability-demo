@@ -361,7 +361,9 @@
       insights: def.insights || { events: [], ending: [], pattern: [], freshness: [] }, notes: [],
       income_detail: def.income_detail || [], me: def.me || null,
     }));
-    c.status = "REVIEW";
+    // Still collecting while anyone's credit report or Open Banking is to come (the service's state).
+    c.status = v.parties.some((p) => p.role !== "COMPANY" && (p.missing || []).some((m) => m === "CREDIT" || m === "OPEN_BANKING"))
+      ? "COLLECTING" : "REVIEW";
     Object.assign(c, extra || {});
     c.baseline = JSON.parse(JSON.stringify(c.factfind.data));
     return c;
@@ -697,6 +699,41 @@
     return out;
   }
 
+  // --- what is still to come on the Quilter form (planner/gaps.py; the two must agree) ----
+  const CHECK_NAMES = { OPEN_BANKING: "Open Banking", CREDIT: "Credit report" };
+  const WHAT_IT_ADDS = { OPEN_BANKING: "income, and every outgoing line on the form (read from the bank statements)",
+                         CREDIT: "debt repayments: loans, credit cards and finance agreements" };
+  // b: budgetPlanner(kase, "form", ...); spec: that layout. Each line is filled by one check: debt
+  // repayments by the credit report, everything else by Open Banking. A person who hasn't had it yet
+  // leaves the line part-filled (some people's in) or waiting (nobody's).
+  function budgetGaps(kase, b, spec, lines) {
+    const credit = new Set(lines.filter((l) => l.commitment_types.length).map((l) => l.key));
+    const who = kase.parties.filter((p) => p.role !== "COMPANY").map((p) => ({ name: p.name || p.key, received: p.sources || [] }));
+    const checkFor = (items) => (items.length && items.every((i) => credit.has(i)) ? "CREDIT" : "OPEN_BANKING");
+    const mark = (row, check) => {
+      const missing = who.filter((p) => !p.received.includes(check)).map((p) => p.name);
+      const state = !missing.length ? "complete" : missing.length === who.length ? "waiting" : "part";
+      Object.assign(row, { check: CHECK_NAMES[check], state: state, waiting_on: missing,
+        customer_only: state === "waiting" && num(row.value) !== 0,
+        waiting_text: state === "complete" ? "" : state === "waiting" ? `Waiting on ${CHECK_NAMES[check].toLowerCase()}`
+          : `Not yet including ${missing.join(", ")}'s ${CHECK_NAMES[check].toLowerCase()}` });
+      return state !== "complete";
+    };
+    let incomplete = false;
+    b.income.forEach((r) => { incomplete = mark(r, "OPEN_BANKING") || incomplete; });
+    b.income_so_far = incomplete;
+    b.sections.forEach((section, i) => {
+      let part = false;
+      section.rows.forEach((r, j) => { part = mark(r, checkFor(spec.sections[i][2][j][1])) || part; });
+      section.so_far = part; incomplete = incomplete || part;
+    });
+    b.so_far = incomplete;
+    b.still_to_come = [];
+    who.forEach((p) => ["OPEN_BANKING", "CREDIT"].forEach((c) => { if (!p.received.includes(c))
+      b.still_to_come.push({ who: p.name, check: c, name: CHECK_NAMES[c], adds: WHAT_IT_ADDS[c] }); }));
+    return b;
+  }
+
   // --- where each planner line came from (cases/prepopulated.line_notes) -----------------
   // For every planner line: its value, its source, the bank category or
   // credit report account behind it, and who was paid month by month.
@@ -790,7 +827,7 @@
   const api = { getPath, setPath, recalculate, accept, dismiss, recategorise, recheckSpending,
                 bankLines, breakdown, render, fillWorkbook, addC2CSheets, formatValue, creditLineFor, fmt, num, lineNotes,
                 makeCase, rename, glance, changes, dataPack, bankReport, statement, chart, chartSvg, payer,
-                categoryPath, MONTHS, budgetPlanner, creditCommitments, creditLimits, lenderWords };
+                categoryPath, MONTHS, budgetPlanner, budgetGaps, creditCommitments, creditLimits, lenderWords };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Engine = api;
 })(typeof window !== "undefined" ? window : globalThis);

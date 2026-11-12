@@ -476,6 +476,14 @@
   @keyframes flashrow { 0%, 35% { background: #fff1a8; } 100% { background: transparent; } }
   .flash { animation: flash 2.8s ease-out; }
   tr.flash { animation: none; } tr.flash > td { animation: flashrow 2.8s ease-out; }
+  /* The Quilter budget planner form: what is still to come (planner/form.html) */
+  .to-come { border: 1px solid rgba(230,23,88,0.35); background: rgba(230,23,88,0.05); border-radius: 8px; padding: 12px 16px; margin: 0 0 14px; }
+  .to-come ul { margin: 6px 0 0; padding-left: 18px; }
+  .all-in { border: 1px solid rgba(60,184,154,0.45); background: rgba(60,184,154,0.08); border-radius: 8px; padding: 10px 16px; margin: 0 0 14px; }
+  .waiting-note { display: block; font-size: 12px; color: var(--brand); }
+  .waiting-figure { color: var(--muted); font-style: italic; }
+  .part-mark { color: var(--brand); margin-left: 2px; }
+  .so-far { font-weight: 500; color: var(--brand); font-size: 12px; margin-left: 6px; }
   /* The budget planner (cases/base.html) */
   .budget-switch { display: flex; gap: 2px; border-bottom: 1px solid #ececef; margin-bottom: 12px; }
   .budget-switch[hidden] { display: none; }
@@ -807,7 +815,7 @@
   function openCase(c) {
     if (currentCase !== c) { pick = "all"; caseTab = "summary"; }
     currentCase = c;
-    $("example-case").innerHTML = state.cases.map((x, i) => `<option value="${i}"${x === c ? " selected" : ""}>${esc(caseTitle(x))}</option>`).join("");
+    $("example-case").innerHTML = state.cases.map((x, i) => `<option value="${i}"${x === c ? " selected" : ""}>${esc(caseTitle(x))}${x.status === "COLLECTING" ? " (checks still to come)" : ""}</option>`).join("");
     showView("case"); renderCase();
   }
 
@@ -1701,6 +1709,34 @@
 
   // The C2C forms prepopulated (cases/prepopulated.py): every line with its
   // source, the bank category or credit report account, and what it is made of.
+  // The Quilter budget planner form (Aly's), with what is still to come (planner/form.html).
+  function quilterHtml(c) {
+    const b = E.budgetGaps(c, E.budgetPlanner(c, "form", { form: D.quilter_form }, D.lines), D.quilter_form, D.lines);
+    const shown = (r) => (r.state === "waiting" && !r.customer_only ? '<span class="waiting-figure">Waiting</span>' : gbp(r.value)) + (r.state === "part" ? '<span class="part-mark">*</span>' : "");
+    const from = (r) => (r.customer_only ? pill("declared", "Customer, not yet checked")
+        : r.from.map((f) => pill(f === "Credit report" ? "difference" : f === "Open Banking" ? "verified" : "derived", f)).join(" "))
+      + (r.state !== "complete" ? " " + pill("alert", "Waiting: " + r.check) : "");
+    const note = (r) => (r.waiting_text ? `<span class="waiting-note">${esc(r.waiting_text)}</span>` : "");
+    const soFar = (on, text) => (on ? `<span class="so-far">${text || "so far"}</span>` : "");
+    const who = c.parties.filter((p) => p.role !== "COMPANY").map((p) => p.name).join(" & ");
+    return `<div class="section" data-src="all"><h2 id="quilter">Budget planner form</h2>
+      <p class="section-note">Quilter's budget planner form, filled from the checks that are in. Where a check is still to come, the lines it fills say so, and the totals are the figures so far.</p>
+      ${b.still_to_come.length ? `<div class="to-come"><strong>Still to come</strong><ul>${b.still_to_come.map((g) => `<li><strong>${esc(g.who)} · ${esc(g.name)}</strong>: adds ${esc(g.adds)}.</li>`).join("")}</ul></div>`
+        : `<div class="all-in">All the checks are in: Open Banking and the credit report for ${esc(who)}.</div>`}
+      <div class="panel budget"><p class="small muted" style="margin:0 0 8px">${esc(b.note)}</p>
+      <div class="table-wrap"><table class="budget-table"><thead><tr><th>Client name: ${esc(caseTitle(c))}</th><th class="num">£ a month</th><th>From</th></tr></thead><tbody>
+        <tr class="budget-head"><td colspan="3">Income</td></tr>
+        ${b.income.map((r) => `<tr><td>${esc(r.label)}${r.before_tax ? `<br><span class="small muted">After tax; before tax ${gbp(r.before_tax)}</span>` : ""}${note(r)}</td><td class="num">${shown(r)}</td><td>${from(r)}</td></tr>`).join("")}
+        <tr class="budget-total"><td>Total income${soFar(b.income_so_far)}</td><td class="num">${gbp(b.income_total)}</td><td></td></tr>
+        ${b.sections.map((sec) => `<tr class="budget-head"><td colspan="3">${esc(sec.title)}</td></tr>
+          ${sec.rows.map((r) => `<tr class="${r.value === "0.00" && r.state === "complete" ? "budget-zero" : ""}"><td>${esc(r.label)}${r.made_of.length ? `<br><span class="small muted">${esc(r.made_of.join(", "))}</span>` : ""}${note(r)}</td>
+            <td class="num">${shown(r)}</td><td>${from(r)}</td></tr>`).join("")}
+          ${sec.total ? `<tr class="budget-total"><td>${esc(sec.total.label)}${soFar(sec.so_far)}</td><td class="num">${gbp(sec.total.value)}</td><td></td></tr>` : ""}`).join("")}
+        <tr class="budget-result"><td>${esc(b.result.label)}${soFar(b.so_far, "so far: checks still to come")}</td><td class="num">${gbp(b.result.value)}</td><td></td></tr>
+      </tbody></table></div>
+      ${b.so_far ? '<p class="small muted" style="margin:8px 0 0">* Includes some people\'s figures; the rest are still to come.</p>' : ""}</div></div>`;
+  }
+
   const FORMS = { c2c: "C2C budget planner", mef: "Mortgage Expenditure Form" };
   const FORM_GROUPS = ["Committed", "Basic Essential", "Basic Quality of Living"];
   function formSections(c, key) {
@@ -1988,7 +2024,7 @@
     const found = flagsFor(c), act = found.filter((f) => f.level === "ACT").length, check = found.filter((f) => f.level === "CHECK").length;
     const dot = `<span class="dot ${act ? "act" : check ? "check" : "ok"}"></span>`;
     const tabs = [["summary", dot + (act ? "Worth a look" : check ? "For information" : "Nothing to note"), act + check],
-                  ["budget", "Budget planner"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
+                  ["budget", "Budget planner"], ["quilter", "Budget planner form"], ["income", "Income and expenditure"], ["taken", "Fact find", blocking(c)],
                   ["bank", "Bank transactions", Object.keys(waiting).length],
                   ["sources", "Sources"], ["outputs", "Outputs and audit"]];
     if (!tabs.some(([k]) => k === caseTab)) caseTab = "summary";
@@ -2019,6 +2055,8 @@
       ${panel("summary", summaryHtml(c))}
 
       ${panel("budget", budgetHtml(c) + budgetPeople(c).map((p) => budgetHtml(personCase(c, p.key), p)).join(""))}
+
+      ${panel("quilter", quilterHtml(c))}
 
       ${panel("income", bankReportHtml(c))}
 
